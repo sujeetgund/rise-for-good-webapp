@@ -53,7 +53,7 @@ export function FilterControls({ type, onFilterChange }: FilterControlsProps) {
             <SelectValue placeholder="All Categories" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Categories</SelectItem>
+            {/* <SelectItem value="">All Categories</SelectItem> */}
             {categories.map(category => (
               <SelectItem key={category} value={category}>{category}</SelectItem>
             ))}
@@ -64,7 +64,7 @@ export function FilterControls({ type, onFilterChange }: FilterControlsProps) {
             <SelectValue placeholder="All Locations" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Locations</SelectItem>
+            {/* <SelectItem value="">All Locations</SelectItem> */}
             {LOCATIONS.map(location => (
               <SelectItem key={location} value={location}>{location}</SelectItem>
             ))}
