@@ -9,7 +9,7 @@ export function SupporterShowcase() {
   const totalSupporters = 15087; // Example data
   const milestonesReached = 3; // Example data
 
-  const duplicatedSupporters = [...mockSupporters, ...mockSupporters]; // For continuous scroll effect
+  const duplicatedSupporters = [...mockSupporters]; // For continuous scroll effect
 
   return (
     <section className="py-16 md:py-24 mt-16 md:mt-24">
@@ -19,7 +19,7 @@ export function SupporterShowcase() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-4 flex items-center justify-center">
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-4 flex flex-col gap-4 md:gap-0 md:flex-row items-center justify-center">
             <Heart className="mr-3 h-10 w-10 text-primary" />
             Our Amazing Supporters
           </h2>
@@ -80,7 +80,7 @@ export function SupporterShowcase() {
                     </Avatar>
                     <div>
                       <p className="font-semibold text-sm">{supporter.name}</p>
-                      <p className="text-xs text-muted-foreground">{supporter.contribution}</p>
+                      <p className="text-xs text-muted-foreground" suppressHydrationWarning>{supporter.contribution}</p>
                     </div>
                   </div>
                 ))}

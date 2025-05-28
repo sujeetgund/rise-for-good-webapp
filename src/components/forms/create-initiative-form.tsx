@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,16 +23,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PETITION_CATEGORIES, CAMPAIGN_CATEGORIES } from "@/lib/constants";
 import { InitiativeType } from "@/types";
 import {
   moderateCampaignContent,
   ModerateCampaignContentOutput,
 } from "@/ai/flows/moderate-campaign-content";
+import {
+  generateInitiativeImage,
+  GenerateInitiativeImageOutput,
+} from "@/ai/flows/generate-initiative-image-flow";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
-import { Loader2, Sparkles } from "lucide-react";
+import { useState, useEffect } from "react";
+import Image from "next/image";
+import { Loader2, Sparkles, ImagePlus, AlertCircle, LinkIcon, Wand2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const formSchemaBase = z.object({
@@ -46,9 +52,10 @@ const formSchemaBase = z.object({
   category: z.string().min(1, { message: "Please select a category." }),
   imageUrl: z
     .string()
-    .url({ message: "Please enter a valid image URL." })
+    .url({ message: "Please enter a valid image URL or ensure AI image is generated." })
     .optional()
-    .or(z.literal("")),
+    .or(z.literal("")), // Allow empty string if no image
+  contentWarning: z.string().optional(),
 });
 
 const petitionSchema = formSchemaBase.extend({
@@ -61,7 +68,6 @@ const campaignSchema = formSchemaBase.extend({
   goalAmount: z.coerce
     .number()
     .min(10, { message: "Goal amount must be at least $10." }),
-  isVerified: z.boolean().default(false).optional(), // Assuming verification is manual or separate
 });
 
 interface CreateInitiativeFormProps {
@@ -82,6 +88,14 @@ export function CreateInitiativeForm({
   const [moderationResult, setModerationResult] =
     useState<ModerateCampaignContentOutput | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [imageInputMode, setImageInputMode] = useState<'manual' | 'ai'>('manual');
+  const [manualImageUrlInput, setManualImageUrlInput] = useState("");
+  const [aiImagePrompt, setAiImagePrompt] = useState("");
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [isProcessingManualUrl, setIsProcessingManualUrl] = useState(false);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+
 
   const currentSchema =
     type === InitiativeType.Petition ? petitionSchema : campaignSchema;
@@ -96,12 +110,29 @@ export function CreateInitiativeForm({
       title: "",
       description: "",
       category: "",
-      imageUrl: "",
+      imageUrl: "", // Default to empty, will be populated by manual or AI
+      contentWarning: "",
       ...(type === InitiativeType.Petition
         ? { goal: 100 }
-        : { goalAmount: 1000, isVerified: false }),
+        : { goalAmount: 1000 }),
     },
   });
+
+  // Effect to clear imageUrl if mode changes and no valid image is set for the new mode
+  useEffect(() => {
+    if (imageInputMode === 'manual' && !manualImageUrlInput.startsWith('http')) {
+        // If switching to manual and input is not a valid URL (or AI image was set), clear it
+        // unless manualImageUrlInput actually holds the current form.imageUrl
+        if (form.getValues("imageUrl") !== manualImageUrlInput) {
+             // form.setValue("imageUrl", "", { shouldValidate: false }); // Don't validate yet
+            // setImagePreviewUrl(null); // Clear preview too
+        }
+    } else if (imageInputMode === 'ai' && !form.getValues("imageUrl")?.startsWith('data:image')) {
+         // If switching to AI and current URL is not a data URI (AI image was not set or was manual)
+         // No explicit clear needed here, AI gen will overwrite or it stays empty
+    }
+  }, [imageInputMode, form, manualImageUrlInput]);
+
 
   const handleModerateContent = async () => {
     const title = form.getValues("title");
@@ -125,6 +156,8 @@ export function CreateInitiativeForm({
         contentType: type,
       });
       setModerationResult(result);
+      form.setValue("contentWarning", result.isAppropriate ? "" : result.reasoning.substring(0, 100) + (result.reasoning.length > 100 ? "..." : ""));
+
       toast({
         title: "Content Moderated",
         description: result.isAppropriate
@@ -152,6 +185,83 @@ export function CreateInitiativeForm({
     }
   };
 
+  const handleGenerateImageWithAI = async () => {
+    if (!aiImagePrompt.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Missing Prompt",
+        description: "Please enter a prompt for image generation.",
+      });
+      return;
+    }
+    setIsGeneratingImage(true);
+    setImagePreviewUrl(null); 
+    form.setValue("imageUrl", "", {shouldValidate: false}); // Clear previous image URL
+    try {
+      const result: GenerateInitiativeImageOutput = await generateInitiativeImage({ prompt: aiImagePrompt });
+      form.setValue("imageUrl", result.imageDataUri, { shouldValidate: true });
+      setImagePreviewUrl(result.imageDataUri);
+      setManualImageUrlInput(""); // Clear manual input field
+      toast({
+        title: "Image Generated!",
+        description: "The AI has created an image for your initiative.",
+      });
+    } catch (error) {
+      console.error("Image generation error:", error);
+      let description = "Could not generate image at this time. Please try again.";
+      if (error instanceof Error && error.message.includes('safety filters')) {
+        description = "Image generation failed. The prompt might have been blocked by safety filters. Please try a different prompt.";
+      }
+      toast({
+        variant: "destructive",
+        title: "Image Generation Failed",
+        description: description,
+      });
+      form.setValue("imageUrl", "", { shouldValidate: true }); // Clear on failure
+      setImagePreviewUrl(null);
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
+
+  const handleUseManualImageUrl = () => {
+    const url = manualImageUrlInput.trim();
+    setIsProcessingManualUrl(true);
+    if (!url) {
+      toast({
+        variant: "destructive",
+        title: "Missing URL",
+        description: "Please enter an image URL.",
+      });
+      form.setValue("imageUrl", "", { shouldValidate: true });
+      setImagePreviewUrl(null);
+      setIsProcessingManualUrl(false);
+      return;
+    }
+    // Basic check, Zod will do the heavy lifting
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+         toast({
+            variant: "destructive",
+            title: "Invalid URL Format",
+            description: "Please enter a valid image URL starting with http:// or https://.",
+        });
+        // form.setValue("imageUrl", "", { shouldValidate: true }); // Let Zod catch this if user insists
+        // setImagePreviewUrl(null); // Don't show preview for clearly invalid URL
+        setIsProcessingManualUrl(false);
+        return;
+    }
+
+    form.setValue("imageUrl", url, { shouldValidate: true });
+    setImagePreviewUrl(url); // Optimistically show preview
+    setAiImagePrompt(""); // Clear AI prompt
+    toast({
+      title: "Image URL Set",
+      description: "Using the provided URL. Preview updated.",
+    });
+    setIsProcessingManualUrl(false);
+  }
+
+
   const onFormSubmit = async (values: z.infer<typeof currentSchema>) => {
     setIsSubmitting(true);
     if (!moderationResult?.isAppropriate) {
@@ -160,21 +270,33 @@ export function CreateInitiativeForm({
           variant: "destructive",
           title: "Content Not Approved",
           description:
-            "Please address the moderation feedback before submitting, or use the AI suggested revision.",
+            "Please address the moderation feedback before submitting, or use the AI suggested revision. A content warning will be added based on the moderation.",
         });
-        setIsSubmitting(false);
-        return;
-      }
-      // If not moderated yet, prompt user
+        values.contentWarning = moderationResult.reasoning.substring(0, 150) + (moderationResult.reasoning.length > 150 ? "..." : "");
+
+      } else if (!moderationResult) {
       toast({
         variant: "default",
-        title: "Moderation Required",
+        title: "Content Not Moderated",
         description:
-          'Please moderate the content using the "Check Content with AI" button before submitting.',
+          'Content has not been checked by AI. A generic warning may be applied or it might be reviewed later. Consider using "Check Content with AI".',
       });
-      setIsSubmitting(false);
-      return;
+       values.contentWarning = "Content subject to review.";
+      }
+    } else {
+       values.contentWarning = ""; 
     }
+    
+    // Ensure imageUrl is empty if no valid image was actually set by user actions
+    if (!imagePreviewUrl || (imageInputMode === 'manual' && form.getValues("imageUrl") !== manualImageUrlInput) || (imageInputMode === 'ai' && !form.getValues("imageUrl")?.startsWith('data:image'))) {
+        // This check is a bit complex due to reactive updates.
+        // Simpler: if imagePreviewUrl is null, ensure imageUrl is also considered null/empty by form
+        if (!imagePreviewUrl) {
+          values.imageUrl = "";
+        }
+    }
+
+
     await onSubmit(values, moderationResult ?? undefined);
     setIsSubmitting(false);
   };
@@ -314,36 +436,113 @@ export function CreateInitiativeForm({
             />
           )}
         </div>
+        
+        {/* Image Section with Tabs */}
+        <FormItem>
+            <FormLabel className="text-lg font-semibold">Initiative Image (Optional)</FormLabel>
+            <Tabs value={imageInputMode} onValueChange={(value) => setImageInputMode(value as 'manual' | 'ai')} className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="manual"><LinkIcon className="mr-2 h-4 w-4" />Manual URL</TabsTrigger>
+                    <TabsTrigger value="ai"><Wand2 className="mr-2 h-4 w-4" />Generate with AI</TabsTrigger>
+                </TabsList>
+                <TabsContent value="manual" className="mt-4 space-y-3">
+                    <Input
+                        placeholder="Paste image URL here (e.g., https://example.com/image.png)"
+                        value={manualImageUrlInput}
+                        onChange={(e) => setManualImageUrlInput(e.target.value)}
+                        className="text-base"
+                        disabled={isProcessingManualUrl || isGeneratingImage}
+                    />
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleUseManualImageUrl}
+                        disabled={isProcessingManualUrl || isGeneratingImage || !manualImageUrlInput.trim()}
+                         className="btn-glow-accent hover:border-accent"
+                    >
+                        {isProcessingManualUrl ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                            <ImagePlus className="mr-2 h-4 w-4" />
+                        )}
+                        Use this Image
+                    </Button>
+                    <FormDescription>
+                      Provide a direct link to an image. Preview will appear below if valid.
+                    </FormDescription>
+                </TabsContent>
+                <TabsContent value="ai" className="mt-4 space-y-3">
+                    <Input
+                        id="aiImagePrompt"
+                        placeholder="e.g., 'Happy diverse community members collaborating'"
+                        value={aiImagePrompt}
+                        onChange={(e) => setAiImagePrompt(e.target.value)}
+                        className="text-base"
+                        disabled={isGeneratingImage || isProcessingManualUrl}
+                    />
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleGenerateImageWithAI}
+                        disabled={isGeneratingImage || isProcessingManualUrl || isSubmitting || !aiImagePrompt.trim()}
+                        className="btn-glow-accent hover:border-accent"
+                    >
+                        {isGeneratingImage ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        )}
+                        Generate Image
+                    </Button>
+                    {isGeneratingImage && <p className="text-sm text-muted-foreground">Generating image, please wait...</p>}
+                     <FormDescription>
+                      Describe the image you want the AI to create.
+                    </FormDescription>
+                </TabsContent>
+            </Tabs>
+             {/* Hidden FormField for Zod validation message on imageUrl */}
+            <FormField
+              control={form.control}
+              name="imageUrl"
+              render={({ fieldState }) => (
+                <FormItem className="h-0 m-0 p-0"> 
+                  {/* This FormItem is only for the message, not for display of input */}
+                  {fieldState.error && <FormMessage className="mt-2" />}
+                </FormItem>
+              )}
+            />
+        </FormItem>
 
-        <FormField
-          control={form.control}
-          name="imageUrl"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-lg font-semibold">
-                Image URL (Optional)
-              </FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="https://example.com/image.png"
-                  {...field}
-                  className="text-base"
-                />
-              </FormControl>
-              <FormDescription>
-                A relevant image can increase engagement.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        {imagePreviewUrl && (
+          <div className="mt-4">
+            <p className="text-sm font-medium mb-2">Image Preview:</p>
+            <Image
+              src={imagePreviewUrl}
+              alt="Initiative image preview"
+              width={300}
+              height={168}
+              className="rounded-md border border-border object-cover"
+              data-ai-hint="initiative image"
+              onError={() => {
+                toast({
+                    variant: "destructive",
+                    title: "Image Load Error",
+                    description: "Could not load the preview for the provided URL. Please check the link.",
+                });
+                setImagePreviewUrl(null); // Clear preview on error
+                form.setValue("imageUrl", "", { shouldValidate: true }); // Clear form value too
+              }}
+            />
+          </div>
+        )}
+
 
         {moderationResult && (
           <Alert
             variant={moderationResult.isAppropriate ? "default" : "destructive"}
             className="mt-6"
           >
-            <Sparkles className="h-5 w-5 text-accent" />
+            {moderationResult.isAppropriate ? <Sparkles className="h-5 w-5 text-accent" /> : <AlertCircle className="h-5 w-5 text-destructive" />}
             <AlertTitle className="font-semibold">
               {moderationResult.isAppropriate
                 ? "AI Content Check: Approved"
@@ -397,7 +596,7 @@ export function CreateInitiativeForm({
             type="button"
             variant="outline"
             onClick={handleModerateContent}
-            disabled={isModerating || isSubmitting}
+            disabled={isModerating || isSubmitting || isGeneratingImage || isProcessingManualUrl}
             className="btn-glow-accent hover:border-accent w-full sm:w-auto"
           >
             {isModerating ? (
@@ -409,7 +608,7 @@ export function CreateInitiativeForm({
           </Button>
           <Button
             type="submit"
-            disabled={isSubmitting || isModerating}
+            disabled={isSubmitting || isModerating || isGeneratingImage || isProcessingManualUrl}
             className="bg-primary text-primary-foreground btn-glow-primary w-full sm:w-auto"
           >
             {isSubmitting ? (
@@ -422,3 +621,4 @@ export function CreateInitiativeForm({
     </Form>
   );
 }
+
