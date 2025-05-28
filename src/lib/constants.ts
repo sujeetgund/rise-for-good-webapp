@@ -1,5 +1,4 @@
 export const INSPIRING_MESSAGES = [
-  "Be the change you wish to see in the world.",
   "Your voice matters. Make it heard.",
   "Small actions, big impact. Start today.",
   "Together, we can build a better future.",
