@@ -34,11 +34,16 @@ import {
   generateInitiativeImage,
   GenerateInitiativeImageOutput,
 } from "@/ai/flows/generate-initiative-image-flow";
+import { 
+  getImageGenerationCredits, 
+  recordImageGenerationAndUpdateCredits 
+} from "@/actions/user-credits";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import { Loader2, Sparkles, ImagePlus, AlertCircle, LinkIcon, Wand2 } from "lucide-react";
+import { Loader2, Sparkles, ImagePlus, AlertCircle, LinkIcon, Wand2, CreditCard } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useUser } from "@clerk/nextjs";
 
 const formSchemaBase = z.object({
   title: z
@@ -84,6 +89,8 @@ export function CreateInitiativeForm({
   onSubmit,
 }: CreateInitiativeFormProps) {
   const { toast } = useToast();
+  const { user, isSignedIn } = useUser();
+
   const [isModerating, setIsModerating] = useState(false);
   const [moderationResult, setModerationResult] =
     useState<ModerateCampaignContentOutput | null>(null);
@@ -96,6 +103,8 @@ export function CreateInitiativeForm({
   const [isProcessingManualUrl, setIsProcessingManualUrl] = useState(false);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
+  const [imageCredits, setImageCredits] = useState<number | null>(null);
+  const [isLoadingCredits, setIsLoadingCredits] = useState(false);
 
   const currentSchema =
     type === InitiativeType.Petition ? petitionSchema : campaignSchema;
@@ -110,7 +119,7 @@ export function CreateInitiativeForm({
       title: "",
       description: "",
       category: "",
-      imageUrl: "", // Default to empty, will be populated by manual or AI
+      imageUrl: "", 
       contentWarning: "",
       ...(type === InitiativeType.Petition
         ? { goal: 100 }
@@ -118,18 +127,36 @@ export function CreateInitiativeForm({
     },
   });
 
-  // Effect to clear imageUrl if mode changes and no valid image is set for the new mode
+  const fetchCredits = async () => {
+    if (!isSignedIn) return;
+    setIsLoadingCredits(true);
+    try {
+      const credits = await getImageGenerationCredits();
+      setImageCredits(credits);
+    } catch (error) {
+      console.error("Failed to fetch image credits:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Could not fetch image generation credits.",
+      });
+      setImageCredits(0); // Default to 0 on error
+    } finally {
+      setIsLoadingCredits(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCredits();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSignedIn, user]);
+
+
   useEffect(() => {
     if (imageInputMode === 'manual' && !manualImageUrlInput.startsWith('http')) {
-        // If switching to manual and input is not a valid URL (or AI image was set), clear it
-        // unless manualImageUrlInput actually holds the current form.imageUrl
         if (form.getValues("imageUrl") !== manualImageUrlInput) {
-             // form.setValue("imageUrl", "", { shouldValidate: false }); // Don't validate yet
-            // setImagePreviewUrl(null); // Clear preview too
+          // Form value is not cleared here to avoid Zod error prematurely
         }
-    } else if (imageInputMode === 'ai' && !form.getValues("imageUrl")?.startsWith('data:image')) {
-         // If switching to AI and current URL is not a data URI (AI image was not set or was manual)
-         // No explicit clear needed here, AI gen will overwrite or it stays empty
     }
   }, [imageInputMode, form, manualImageUrlInput]);
 
@@ -186,6 +213,14 @@ export function CreateInitiativeForm({
   };
 
   const handleGenerateImageWithAI = async () => {
+    if (isLoadingCredits || imageCredits === null || imageCredits <= 0) {
+      toast({
+        variant: "destructive",
+        title: "No Credits",
+        description: "You have no AI image generation credits left this month.",
+      });
+      return;
+    }
     if (!aiImagePrompt.trim()) {
       toast({
         variant: "destructive",
@@ -196,29 +231,43 @@ export function CreateInitiativeForm({
     }
     setIsGeneratingImage(true);
     setImagePreviewUrl(null); 
-    form.setValue("imageUrl", "", {shouldValidate: false}); // Clear previous image URL
+    form.setValue("imageUrl", "", {shouldValidate: false});
     try {
       const result: GenerateInitiativeImageOutput = await generateInitiativeImage({ prompt: aiImagePrompt });
       form.setValue("imageUrl", result.imageDataUri, { shouldValidate: true });
       setImagePreviewUrl(result.imageDataUri);
-      setManualImageUrlInput(""); // Clear manual input field
+      setManualImageUrlInput(""); 
+
+      // Decrement credits
+      const updatedCredits = await recordImageGenerationAndUpdateCredits();
+      setImageCredits(updatedCredits);
+      
       toast({
         title: "Image Generated!",
-        description: "The AI has created an image for your initiative.",
+        description: "The AI has created an image for your initiative. Credits updated.",
       });
     } catch (error) {
       console.error("Image generation error:", error);
       let description = "Could not generate image at this time. Please try again.";
-      if (error instanceof Error && error.message.includes('safety filters')) {
-        description = "Image generation failed. The prompt might have been blocked by safety filters. Please try a different prompt.";
+      if (error instanceof Error) {
+        if (error.message.includes('safety filters')) {
+          description = "Image generation failed. The prompt might have been blocked by safety filters. Please try a different prompt.";
+        } else if (error.message.includes('No image generation credits')) {
+          description = "You have no AI image generation credits left for this month.";
+        } else if (error.message.includes('Failed to update image generation credits')) {
+          description = "Image generated, but failed to update credits. Please try again or contact support.";
+        }
       }
+      
       toast({
         variant: "destructive",
         title: "Image Generation Failed",
         description: description,
       });
-      form.setValue("imageUrl", "", { shouldValidate: true }); // Clear on failure
+      form.setValue("imageUrl", "", { shouldValidate: true }); 
       setImagePreviewUrl(null);
+      // Re-fetch credits in case of failure to update, to ensure UI is accurate
+      await fetchCredits();
     } finally {
       setIsGeneratingImage(false);
     }
@@ -238,22 +287,19 @@ export function CreateInitiativeForm({
       setIsProcessingManualUrl(false);
       return;
     }
-    // Basic check, Zod will do the heavy lifting
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
          toast({
             variant: "destructive",
             title: "Invalid URL Format",
             description: "Please enter a valid image URL starting with http:// or https://.",
         });
-        // form.setValue("imageUrl", "", { shouldValidate: true }); // Let Zod catch this if user insists
-        // setImagePreviewUrl(null); // Don't show preview for clearly invalid URL
         setIsProcessingManualUrl(false);
         return;
     }
 
     form.setValue("imageUrl", url, { shouldValidate: true });
-    setImagePreviewUrl(url); // Optimistically show preview
-    setAiImagePrompt(""); // Clear AI prompt
+    setImagePreviewUrl(url); 
+    setAiImagePrompt(""); 
     toast({
       title: "Image URL Set",
       description: "Using the provided URL. Preview updated.",
@@ -287,19 +333,16 @@ export function CreateInitiativeForm({
        values.contentWarning = ""; 
     }
     
-    // Ensure imageUrl is empty if no valid image was actually set by user actions
-    if (!imagePreviewUrl || (imageInputMode === 'manual' && form.getValues("imageUrl") !== manualImageUrlInput) || (imageInputMode === 'ai' && !form.getValues("imageUrl")?.startsWith('data:image'))) {
-        // This check is a bit complex due to reactive updates.
-        // Simpler: if imagePreviewUrl is null, ensure imageUrl is also considered null/empty by form
-        if (!imagePreviewUrl) {
-          values.imageUrl = "";
-        }
+    if (!imagePreviewUrl) {
+        values.imageUrl = "";
     }
 
 
     await onSubmit(values, moderationResult ?? undefined);
     setIsSubmitting(false);
   };
+
+  const canGenerateWithAI = !isLoadingCredits && imageCredits !== null && imageCredits > 0;
 
   return (
     <Form {...form}>
@@ -437,7 +480,6 @@ export function CreateInitiativeForm({
           )}
         </div>
         
-        {/* Image Section with Tabs */}
         <FormItem>
             <FormLabel className="text-lg font-semibold">Initiative Image (Optional)</FormLabel>
             <Tabs value={imageInputMode} onValueChange={(value) => setImageInputMode(value as 'manual' | 'ai')} className="w-full">
@@ -472,19 +514,30 @@ export function CreateInitiativeForm({
                     </FormDescription>
                 </TabsContent>
                 <TabsContent value="ai" className="mt-4 space-y-3">
+                    <div className="flex items-center justify-between mb-2">
+                        <FormLabel htmlFor="aiImagePrompt" className="text-base">AI Image Prompt</FormLabel>
+                        <div className="text-sm text-muted-foreground flex items-center">
+                           {isLoadingCredits ? (
+                             <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                           ) : (
+                             <CreditCard className="mr-1 h-4 w-4 text-accent" />
+                           )}
+                           Credits: {imageCredits ?? '...'} / 10
+                        </div>
+                    </div>
                     <Input
                         id="aiImagePrompt"
                         placeholder="e.g., 'Happy diverse community members collaborating'"
                         value={aiImagePrompt}
                         onChange={(e) => setAiImagePrompt(e.target.value)}
                         className="text-base"
-                        disabled={isGeneratingImage || isProcessingManualUrl}
+                        disabled={isGeneratingImage || isProcessingManualUrl || !canGenerateWithAI}
                     />
                     <Button
                         type="button"
                         variant="outline"
                         onClick={handleGenerateImageWithAI}
-                        disabled={isGeneratingImage || isProcessingManualUrl || isSubmitting || !aiImagePrompt.trim()}
+                        disabled={isGeneratingImage || isProcessingManualUrl || isSubmitting || !aiImagePrompt.trim() || !canGenerateWithAI}
                         className="btn-glow-accent hover:border-accent"
                     >
                         {isGeneratingImage ? (
@@ -494,19 +547,20 @@ export function CreateInitiativeForm({
                         )}
                         Generate Image
                     </Button>
+                    {!canGenerateWithAI && !isLoadingCredits && imageCredits === 0 && (
+                        <p className="text-sm text-destructive">No AI image generation credits remaining this month.</p>
+                    )}
                     {isGeneratingImage && <p className="text-sm text-muted-foreground">Generating image, please wait...</p>}
                      <FormDescription>
-                      Describe the image you want the AI to create.
+                      Describe the image you want the AI to create. Uses 1 credit per generation.
                     </FormDescription>
                 </TabsContent>
             </Tabs>
-             {/* Hidden FormField for Zod validation message on imageUrl */}
             <FormField
               control={form.control}
               name="imageUrl"
               render={({ fieldState }) => (
                 <FormItem className="h-0 m-0 p-0"> 
-                  {/* This FormItem is only for the message, not for display of input */}
                   {fieldState.error && <FormMessage className="mt-2" />}
                 </FormItem>
               )}
@@ -529,8 +583,8 @@ export function CreateInitiativeForm({
                     title: "Image Load Error",
                     description: "Could not load the preview for the provided URL. Please check the link.",
                 });
-                setImagePreviewUrl(null); // Clear preview on error
-                form.setValue("imageUrl", "", { shouldValidate: true }); // Clear form value too
+                setImagePreviewUrl(null); 
+                form.setValue("imageUrl", "", { shouldValidate: true }); 
               }}
             />
           </div>
