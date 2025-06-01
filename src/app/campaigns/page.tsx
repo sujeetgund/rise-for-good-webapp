@@ -74,7 +74,7 @@ export default function CampaignsPage() {
           <h1 className="text-4xl font-bold text-primary">Browse Campaigns</h1>
           <p className="text-muted-foreground mt-2">Support verified causes and help fund important initiatives.</p>
         </div>
-        <Button asChild size="lg" className="bg-accent text-accent-foreground btn-glow-accent">
+        <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 btn-glow-accent">
           <Link href="/campaigns/create">
             <PlusCircle className="mr-2 h-5 w-5" /> Start New Campaign
           </Link>

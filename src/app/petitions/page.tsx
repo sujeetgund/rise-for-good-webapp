@@ -74,7 +74,7 @@ export default function PetitionsPage() {
           <h1 className="text-4xl font-bold text-primary">Browse Petitions</h1>
           <p className="text-muted-foreground mt-2">Find causes you care about and make your voice heard.</p>
         </div>
-        <Button asChild size="lg" className="bg-accent text-accent-foreground btn-glow-accent">
+        <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 btn-glow-accent">
           <Link href="/petitions/create">
             <PlusCircle className="mr-2 h-5 w-5" /> Create New Petition
           </Link>

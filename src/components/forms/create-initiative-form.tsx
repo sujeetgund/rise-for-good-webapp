@@ -34,9 +34,9 @@ import {
   generateInitiativeImage,
   GenerateInitiativeImageOutput,
 } from "@/ai/flows/generate-initiative-image-flow";
-import { 
-  getImageGenerationCredits, 
-  recordImageGenerationAndUpdateCredits 
+import {
+  getImageGenerationCredits,
+  recordImageGenerationAndUpdateCredits
 } from "@/actions/user-credits";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
@@ -95,7 +95,7 @@ export function CreateInitiativeForm({
   const [moderationResult, setModerationResult] =
     useState<ModerateCampaignContentOutput | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const [imageInputMode, setImageInputMode] = useState<'manual' | 'ai'>('manual');
   const [manualImageUrlInput, setManualImageUrlInput] = useState("");
   const [aiImagePrompt, setAiImagePrompt] = useState("");
@@ -119,7 +119,7 @@ export function CreateInitiativeForm({
       title: "",
       description: "",
       category: "",
-      imageUrl: "", 
+      imageUrl: "",
       contentWarning: "",
       ...(type === InitiativeType.Petition
         ? { goal: 100 }
@@ -148,15 +148,15 @@ export function CreateInitiativeForm({
 
   useEffect(() => {
     fetchCredits();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn, user]);
 
 
   useEffect(() => {
     if (imageInputMode === 'manual' && !manualImageUrlInput.startsWith('http')) {
-        if (form.getValues("imageUrl") !== manualImageUrlInput) {
-          // Form value is not cleared here to avoid Zod error prematurely
-        }
+      if (form.getValues("imageUrl") !== manualImageUrlInput) {
+        // Form value is not cleared here to avoid Zod error prematurely
+      }
     }
   }, [imageInputMode, form, manualImageUrlInput]);
 
@@ -230,18 +230,18 @@ export function CreateInitiativeForm({
       return;
     }
     setIsGeneratingImage(true);
-    setImagePreviewUrl(null); 
-    form.setValue("imageUrl", "", {shouldValidate: false});
+    setImagePreviewUrl(null);
+    form.setValue("imageUrl", "", { shouldValidate: false });
     try {
       const result: GenerateInitiativeImageOutput = await generateInitiativeImage({ prompt: aiImagePrompt });
       form.setValue("imageUrl", result.imageDataUri, { shouldValidate: true });
       setImagePreviewUrl(result.imageDataUri);
-      setManualImageUrlInput(""); 
+      setManualImageUrlInput("");
 
       // Decrement credits
       const updatedCredits = await recordImageGenerationAndUpdateCredits();
       setImageCredits(updatedCredits);
-      
+
       toast({
         title: "Image Generated!",
         description: "The AI has created an image for your initiative. Credits updated.",
@@ -258,13 +258,13 @@ export function CreateInitiativeForm({
           description = "Image generated, but failed to update credits. Please try again or contact support.";
         }
       }
-      
+
       toast({
         variant: "destructive",
         title: "Image Generation Failed",
         description: description,
       });
-      form.setValue("imageUrl", "", { shouldValidate: true }); 
+      form.setValue("imageUrl", "", { shouldValidate: true });
       setImagePreviewUrl(null);
       // Re-fetch credits in case of failure to update, to ensure UI is accurate
       await fetchCredits();
@@ -288,18 +288,18 @@ export function CreateInitiativeForm({
       return;
     }
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-         toast({
-            variant: "destructive",
-            title: "Invalid URL Format",
-            description: "Please enter a valid image URL starting with http:// or https://.",
-        });
-        setIsProcessingManualUrl(false);
-        return;
+      toast({
+        variant: "destructive",
+        title: "Invalid URL Format",
+        description: "Please enter a valid image URL starting with http:// or https://.",
+      });
+      setIsProcessingManualUrl(false);
+      return;
     }
 
     form.setValue("imageUrl", url, { shouldValidate: true });
-    setImagePreviewUrl(url); 
-    setAiImagePrompt(""); 
+    setImagePreviewUrl(url);
+    setAiImagePrompt("");
     toast({
       title: "Image URL Set",
       description: "Using the provided URL. Preview updated.",
@@ -321,20 +321,20 @@ export function CreateInitiativeForm({
         values.contentWarning = moderationResult.reasoning.substring(0, 150) + (moderationResult.reasoning.length > 150 ? "..." : "");
 
       } else if (!moderationResult) {
-      toast({
-        variant: "default",
-        title: "Content Not Moderated",
-        description:
-          'Content has not been checked by AI. A generic warning may be applied or it might be reviewed later. Consider using "Check Content with AI".',
-      });
-       values.contentWarning = "Content subject to review.";
+        toast({
+          variant: "default",
+          title: "Content Not Moderated",
+          description:
+            'Content has not been checked by AI. A generic warning may be applied or it might be reviewed later. Consider using "Check Content with AI".',
+        });
+        values.contentWarning = "Content subject to review.";
       }
     } else {
-       values.contentWarning = ""; 
+      values.contentWarning = "";
     }
-    
+
     if (!imagePreviewUrl) {
-        values.imageUrl = "";
+      values.imageUrl = "";
     }
 
 
@@ -479,92 +479,92 @@ export function CreateInitiativeForm({
             />
           )}
         </div>
-        
+
         <FormItem>
-            <FormLabel className="text-lg font-semibold">Initiative Image (Optional)</FormLabel>
-            <Tabs value={imageInputMode} onValueChange={(value) => setImageInputMode(value as 'manual' | 'ai')} className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="manual"><LinkIcon className="mr-2 h-4 w-4" />Manual URL</TabsTrigger>
-                    <TabsTrigger value="ai"><Wand2 className="mr-2 h-4 w-4" />Generate with AI</TabsTrigger>
-                </TabsList>
-                <TabsContent value="manual" className="mt-4 space-y-3">
-                    <Input
-                        placeholder="Paste image URL here (e.g., https://example.com/image.png)"
-                        value={manualImageUrlInput}
-                        onChange={(e) => setManualImageUrlInput(e.target.value)}
-                        className="text-base"
-                        disabled={isProcessingManualUrl || isGeneratingImage}
-                    />
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleUseManualImageUrl}
-                        disabled={isProcessingManualUrl || isGeneratingImage || !manualImageUrlInput.trim()}
-                         className="btn-glow-accent hover:border-accent"
-                    >
-                        {isProcessingManualUrl ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                            <ImagePlus className="mr-2 h-4 w-4" />
-                        )}
-                        Use this Image
-                    </Button>
-                    <FormDescription>
-                      Provide a direct link to an image. Preview will appear below if valid.
-                    </FormDescription>
-                </TabsContent>
-                <TabsContent value="ai" className="mt-4 space-y-3">
-                    <div className="flex items-center justify-between mb-2">
-                        <FormLabel htmlFor="aiImagePrompt" className="text-base">AI Image Prompt</FormLabel>
-                        <div className="text-sm text-muted-foreground flex items-center">
-                           {isLoadingCredits ? (
-                             <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                           ) : (
-                             <CreditCard className="mr-1 h-4 w-4 text-accent" />
-                           )}
-                           Credits: {imageCredits ?? '...'} / 10
-                        </div>
-                    </div>
-                    <Input
-                        id="aiImagePrompt"
-                        placeholder="e.g., 'Happy diverse community members collaborating'"
-                        value={aiImagePrompt}
-                        onChange={(e) => setAiImagePrompt(e.target.value)}
-                        className="text-base"
-                        disabled={isGeneratingImage || isProcessingManualUrl || !canGenerateWithAI}
-                    />
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleGenerateImageWithAI}
-                        disabled={isGeneratingImage || isProcessingManualUrl || isSubmitting || !aiImagePrompt.trim() || !canGenerateWithAI}
-                        className="btn-glow-accent hover:border-accent"
-                    >
-                        {isGeneratingImage ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        )}
-                        Generate Image
-                    </Button>
-                    {!canGenerateWithAI && !isLoadingCredits && imageCredits === 0 && (
-                        <p className="text-sm text-destructive">No AI image generation credits remaining this month.</p>
-                    )}
-                    {isGeneratingImage && <p className="text-sm text-muted-foreground">Generating image, please wait...</p>}
-                     <FormDescription>
-                      Describe the image you want the AI to create. Uses 1 credit per generation.
-                    </FormDescription>
-                </TabsContent>
-            </Tabs>
-            <FormField
-              control={form.control}
-              name="imageUrl"
-              render={({ fieldState }) => (
-                <FormItem className="h-0 m-0 p-0"> 
-                  {fieldState.error && <FormMessage className="mt-2" />}
-                </FormItem>
+          <FormLabel className="text-lg font-semibold">Initiative Image (Optional)</FormLabel>
+          <Tabs value={imageInputMode} onValueChange={(value) => setImageInputMode(value as 'manual' | 'ai')} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="manual"><LinkIcon className="mr-2 h-4 w-4" />URL</TabsTrigger>
+              <TabsTrigger value="ai"><Wand2 className="mr-2 h-4 w-4" />AI</TabsTrigger>
+            </TabsList>
+            <TabsContent value="manual" className="mt-4 space-y-3">
+              <Input
+                placeholder="Paste image URL here (e.g., https://example.com/image.png)"
+                value={manualImageUrlInput}
+                onChange={(e) => setManualImageUrlInput(e.target.value)}
+                className="text-base"
+                disabled={isProcessingManualUrl || isGeneratingImage}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleUseManualImageUrl}
+                disabled={isProcessingManualUrl || isGeneratingImage || !manualImageUrlInput.trim()}
+                className="btn-glow-accent hover:border-accent"
+              >
+                {isProcessingManualUrl ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <ImagePlus className="mr-2 h-4 w-4" />
+                )}
+                Use this Image
+              </Button>
+              <FormDescription>
+                Provide a direct link to an image. Preview will appear below if valid.
+              </FormDescription>
+            </TabsContent>
+            <TabsContent value="ai" className="mt-4 space-y-3">
+              <Input
+                id="aiImagePrompt"
+                placeholder="e.g., 'Happy diverse community members collaborating'"
+                value={aiImagePrompt}
+                onChange={(e) => setAiImagePrompt(e.target.value)}
+                className="text-base"
+                disabled={isGeneratingImage || isProcessingManualUrl || !canGenerateWithAI}
+              />
+              <div className="flex items-center justify-between mb-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleGenerateImageWithAI}
+                  disabled={isGeneratingImage || isProcessingManualUrl || isSubmitting || !aiImagePrompt.trim() || !canGenerateWithAI}
+                  className="btn-glow-accent hover:border-accent"
+                >
+                  {isGeneratingImage ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-2 h-4 w-4" />
+                  )}
+                  Generate Image
+                </Button>
+                <div className="text-sm text-muted-foreground flex items-center">
+                  {isLoadingCredits ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  ) : (
+                    <CreditCard className="mr-1 h-4 w-4 text-accent" />
+                  )}
+                  Credits: {imageCredits ?? '...'} / 10
+                </div>
+              </div>
+
+              {!canGenerateWithAI && !isLoadingCredits && imageCredits === 0 && (
+                <p className="text-sm text-destructive">No AI image generation credits remaining this month.</p>
               )}
-            />
+              {isGeneratingImage && <p className="text-sm text-muted-foreground">Generating image, please wait...</p>}
+              <FormDescription>
+                Describe the image you want the AI to create. Uses 1 credit per generation.
+              </FormDescription>
+            </TabsContent>
+          </Tabs>
+          <FormField
+            control={form.control}
+            name="imageUrl"
+            render={({ fieldState }) => (
+              <FormItem className="h-0 m-0 p-0">
+                {fieldState.error && <FormMessage className="mt-2" />}
+              </FormItem>
+            )}
+          />
         </FormItem>
 
         {imagePreviewUrl && (
@@ -579,12 +579,12 @@ export function CreateInitiativeForm({
               data-ai-hint="initiative image"
               onError={() => {
                 toast({
-                    variant: "destructive",
-                    title: "Image Load Error",
-                    description: "Could not load the preview for the provided URL. Please check the link.",
+                  variant: "destructive",
+                  title: "Image Load Error",
+                  description: "Could not load the preview for the provided URL. Please check the link.",
                 });
-                setImagePreviewUrl(null); 
-                form.setValue("imageUrl", "", { shouldValidate: true }); 
+                setImagePreviewUrl(null);
+                form.setValue("imageUrl", "", { shouldValidate: true });
               }}
             />
           </div>

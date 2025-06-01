@@ -39,7 +39,7 @@ export function TrendingInitiatives() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-4 flex items-center justify-center">
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-4 flex flex-col gap-4 md:gap-0 md:flex-row items-center justify-center">
             <Flame className="mr-3 h-10 w-10 text-primary" />
             Trending Initiatives
           </h2>
