@@ -10,19 +10,20 @@ import { Button } from '@/components/ui/button';
 import { mockPetitions, mockCampaigns } from '@/lib/mock-data'; // Assuming user specific data would be fetched
 import { InitiativeCard } from '@/components/shared/initiative-card';
 import { InitiativeType } from '@/types';
-import { ListChecks, HandHeart, DollarSign, Settings, Loader2, LogOut, CreditCard, AlertCircle } from 'lucide-react';
+import { ListChecks, HandHeart, DollarSign, Settings, Loader2, LogOut, CreditCard, AlertCircle, ShoppingBag } from 'lucide-react';
 import Image from 'next/image';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { getImageGenerationCredits } from '@/actions/user-credits';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 export default function ProfilePage() {
   const { user, isLoaded } = useUser();
   const isMobile = useIsMobile();
   const { toast } = useToast();
 
-  const [imageCredits, setImageCredits] = useState<number | null>(null);
+  const [totalImageCredits, setTotalImageCredits] = useState<number | null>(null);
   const [isLoadingCredits, setIsLoadingCredits] = useState(false);
   const [creditError, setCreditError] = useState<string | null>(null);
 
@@ -41,24 +42,24 @@ export default function ProfilePage() {
         setCreditError(null);
         try {
           const credits = await getImageGenerationCredits();
-          setImageCredits(credits);
+          setTotalImageCredits(credits);
         } catch (error) {
           console.error("Failed to fetch image credits on profile:", error);
           setCreditError("Could not load credits.");
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: "Failed to fetch image generation credits.",
-          });
+          // toast({ // Toast is already handled in create-initiative-form, avoid double toast
+          //   variant: "destructive",
+          //   title: "Error",
+          //   description: "Failed to fetch image generation credits.",
+          // });
         } finally {
           setIsLoadingCredits(false);
         }
       };
       fetchCredits();
     }
-  }, [user, isLoaded, toast]);
+  }, [user, isLoaded]);
 
-  if (!isLoaded || (user && isLoadingCredits && imageCredits === null) ) {
+  if (!isLoaded || (user && isLoadingCredits && totalImageCredits === null) ) {
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-10rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -76,7 +77,7 @@ export default function ProfilePage() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="space-y-8"
+      className="space-y-8 py-8"
     >
       <header className="flex flex-col md:flex-row items-center gap-6 p-6 bg-card rounded-lg shadow-lg">
         <Image 
@@ -86,46 +87,67 @@ export default function ProfilePage() {
             className="rounded-full border-4 border-primary shadow-md"
             data-ai-hint="person portrait"
         />
-        <div className="flex-grow">
+        <div className="flex-grow text-center md:text-left">
             <h1 className="text-3xl md:text-4xl font-bold text-primary">{user.fullName || user.username}</h1>
             <p className="text-muted-foreground mt-1">{user.primaryEmailAddress?.emailAddress}</p>
             <p className="text-sm text-muted-foreground">Joined: {user.createdAt?.toLocaleDateString()}</p>
-            <div className="mt-2 flex items-center text-sm">
-              <CreditCard className="h-4 w-4 mr-2 text-accent" />
-              {isLoadingCredits && imageCredits === null && <span className="text-muted-foreground">Loading credits...</span>}
-              {creditError && <span className="text-destructive flex items-center"><AlertCircle className="h-4 w-4 mr-1"/>{creditError}</span>}
-              {imageCredits !== null && <span className="text-foreground">Image Credits: {imageCredits}/10</span>}
+            <div className="mt-3 flex flex-col sm:flex-row items-center justify-center md:justify-start gap-2 text-sm">
+              <div className="flex items-center">
+                <CreditCard className="h-4 w-4 mr-2 text-accent" />
+                {isLoadingCredits && totalImageCredits === null && <span className="text-muted-foreground">Loading credits...</span>}
+                {creditError && <span className="text-destructive flex items-center"><AlertCircle className="h-4 w-4 mr-1"/>{creditError}</span>}
+                {totalImageCredits !== null && <span className="text-foreground">Image Credits: {totalImageCredits}</span>}
+              </div>
+              <Button asChild size="sm" variant="outline" className="btn-glow-accent hover:border-accent text-xs px-2 py-1 h-auto">
+                <Link href="/buy-credits">
+                    <ShoppingBag className="mr-1.5 h-3 w-3" /> Buy More Credits
+                </Link>
+              </Button>
             </div>
         </div>
-        <SignOutButton redirectUrl="/">
-            <Button variant="outline" className="ml-auto btn-glow-accent hover:border-accent">
-                <LogOut className="mr-2 h-4 w-4" /> Logout
-            </Button>
-        </SignOutButton>
+        <div className="mt-4 md:mt-0 md:ml-auto flex flex-col items-center md:items-end gap-2">
+            <SignOutButton redirectUrl="/">
+                <Button variant="outline" className="w-full md:w-auto btn-glow-accent hover:border-accent">
+                    <LogOut className="mr-2 h-4 w-4" /> Logout
+                </Button>
+            </SignOutButton>
+            {isMobile && (
+                 <ClerkUserProfile>
+                    <ClerkUserProfile.Link path="account">
+                        <Button variant="outline" className="w-full md:w-auto">
+                            <Settings className="mr-2 h-4 w-4" /> Account Settings
+                        </Button>
+                    </ClerkUserProfile.Link>
+                 </ClerkUserProfile>
+            )}
+        </div>
       </header>
 
       <Tabs defaultValue="petitions" className="w-full">
         <TabsList 
           className={cn(
+            "bg-card border-b border-border rounded-none",
             isMobile 
-            ? "flex w-full overflow-x-auto no-scrollbar flex-nowrap" 
+            ? "flex w-full overflow-x-auto no-scrollbar flex-nowrap px-2" 
             : "grid w-full grid-cols-4"
           )}
         >
           <TabsTrigger 
             value="petitions" 
             className={cn(
-              "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
-              "px-3 py-2 flex-shrink-0 flex items-center gap-1.5"
+              "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md",
+              "text-sm px-3 py-2.5 flex-shrink-0 flex items-center gap-1.5 whitespace-nowrap",
+              isMobile ? "text-xs" : ""
             )}
           >
-            <ListChecks className={cn(isMobile ? "h-4 w-4 ml-16" : "h-4 w-4")} /> My Petitions
+            <ListChecks className={cn("h-4 w-4")} /> My Petitions
           </TabsTrigger>
           <TabsTrigger 
             value="campaigns" 
             className={cn(
-              "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
-              "px-3 py-2 flex-shrink-0 flex items-center gap-1.5"
+              "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md",
+              "text-sm px-3 py-2.5 flex-shrink-0 flex items-center gap-1.5 whitespace-nowrap",
+               isMobile ? "text-xs" : ""
             )}
           >
             <HandHeart className={"h-4 w-4"} /> Supported Initiatives
@@ -133,8 +155,9 @@ export default function ProfilePage() {
           <TabsTrigger 
             value="donations" 
             className={cn(
-              "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
-              "px-3 py-2 flex-shrink-0 flex items-center gap-1.5"
+              "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md",
+              "text-sm px-3 py-2.5 flex-shrink-0 flex items-center gap-1.5 whitespace-nowrap",
+               isMobile ? "text-xs" : ""
             )}
           >
             <DollarSign className={"h-4 w-4"} /> Donation History
@@ -143,8 +166,8 @@ export default function ProfilePage() {
             <TabsTrigger 
               value="settings" 
               className={cn(
-                "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
-                "px-3 py-2 flex-shrink-0 flex items-center gap-1.5" 
+                "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md",
+                "text-sm px-3 py-2.5 flex-shrink-0 flex items-center gap-1.5 whitespace-nowrap"
               )}
             >
               <Settings className={"h-4 w-4"} /> Account Settings
@@ -228,4 +251,3 @@ export default function ProfilePage() {
     </motion.div>
   );
 }
-

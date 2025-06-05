@@ -4,11 +4,12 @@
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import type { User } from '@clerk/nextjs/server';
 
-const MAX_CREDITS_PER_MONTH = 10;
+const MAX_FREE_CREDITS_PER_MONTH = 10;
 
-interface ImageGenerationCredits {
-  count: number;
-  resetMonthYear: string; // Format: "YYYY-MM"
+interface ImageGenerationCreditsMetadata {
+  freeCredits: number;
+  freeCreditsResetMonthYear: string; // Format: "YYYY-MM"
+  purchasedCredits: number;
 }
 
 const getCurrentMonthYear = (): string => {
@@ -16,93 +17,118 @@ const getCurrentMonthYear = (): string => {
 };
 
 /**
- * Retrieves the number of image generation credits for the current user.
- * If it's a new month or the user has no credit data, it resets credits to the max amount.
- * Updates Clerk user publicMetadata if a reset occurs.
+ * Retrieves the total number of image generation credits (free + purchased) for the current user.
+ * Handles monthly reset for free credits. Initializes credits if they don't exist.
  */
 export async function getImageGenerationCredits(): Promise<number> {
   const { userId } = await auth();
   if (!userId) {
-    throw new Error('User not authenticated.');
+    throw new Error('User not authenticated to get credits.');
   }
 
-  const client = await clerkClient()
+  const client = await clerkClient();
 
   try {
     const user: User = await client.users.getUser(userId);
     const currentMonthYear = getCurrentMonthYear();
     const existingPublicMetadata = user.publicMetadata || {};
-    let creditsData = existingPublicMetadata?.imageGenerationCredits as ImageGenerationCredits | undefined;
+    let creditsData = existingPublicMetadata?.imageGenerationCredits as ImageGenerationCreditsMetadata | undefined;
 
-    if (!creditsData || creditsData.resetMonthYear !== currentMonthYear) {
-      // Reset credits for the new month or if no data exists
-      const newCreditsData: ImageGenerationCredits = {
-        count: MAX_CREDITS_PER_MONTH,
-        resetMonthYear: currentMonthYear,
+    let needsUpdate = false;
+
+    if (!creditsData) {
+      creditsData = {
+        freeCredits: MAX_FREE_CREDITS_PER_MONTH,
+        freeCreditsResetMonthYear: currentMonthYear,
+        purchasedCredits: 0,
       };
+      needsUpdate = true;
+    } else {
+      if (creditsData.freeCreditsResetMonthYear !== currentMonthYear) {
+        creditsData.freeCredits = MAX_FREE_CREDITS_PER_MONTH;
+        creditsData.freeCreditsResetMonthYear = currentMonthYear;
+        needsUpdate = true;
+      }
+      // Ensure purchasedCredits exists
+      if (typeof creditsData.purchasedCredits !== 'number') {
+        creditsData.purchasedCredits = 0;
+        needsUpdate = true;
+      }
+    }
+
+    if (needsUpdate) {
       await client.users.updateUserMetadata(userId, {
         publicMetadata: {
           ...existingPublicMetadata,
-          imageGenerationCredits: newCreditsData,
+          imageGenerationCredits: creditsData,
         },
       });
-      return newCreditsData.count;
     }
-    return creditsData.count;
+    return (creditsData.freeCredits || 0) + (creditsData.purchasedCredits || 0);
   } catch (error) {
     console.error('Error getting image generation credits from Clerk:', error);
-    // Re-throw a new error to ensure the client-side catch block handles it properly.
     throw new Error('Failed to retrieve image generation credits from server.');
   }
 }
 
 /**
  * Records that an image generation has occurred and decrements the user's credit count.
- * Handles monthly reset logic internally if needed before decrementing.
- * @returns The new credit count after decrementing.
+ * Prioritizes using purchased credits first, then free credits.
+ * Handles monthly reset logic for free credits internally if needed before decrementing.
+ * @returns The new total credit count after decrementing.
  */
 export async function recordImageGenerationAndUpdateCredits(): Promise<number> {
   const { userId } = await auth();
   if (!userId) {
-    throw new Error('User not authenticated.');
+    throw new Error('User not authenticated to update credits.');
   }
 
-  const client = await clerkClient()
+  const client = await clerkClient();
 
   try {
     const user: User = await client.users.getUser(userId);
     const currentMonthYear = getCurrentMonthYear();
     const existingPublicMetadata = user.publicMetadata || {};
-    let creditsData = existingPublicMetadata?.imageGenerationCredits as ImageGenerationCredits | undefined;
+    let creditsData = existingPublicMetadata?.imageGenerationCredits as ImageGenerationCreditsMetadata | undefined;
 
-    let currentCountBeforeDecrement: number;
-
-    if (!creditsData || creditsData.resetMonthYear !== currentMonthYear) {
-      // Credits should reset for the new month or if no data exists
-      currentCountBeforeDecrement = MAX_CREDITS_PER_MONTH;
+    // Ensure credits data exists and free credits are reset if it's a new month
+    if (!creditsData || creditsData.freeCreditsResetMonthYear !== currentMonthYear) {
+      const currentPurchased = creditsData?.purchasedCredits || 0;
+      creditsData = {
+        freeCredits: MAX_FREE_CREDITS_PER_MONTH,
+        freeCreditsResetMonthYear: currentMonthYear,
+        purchasedCredits: currentPurchased, // Preserve purchased credits
+      };
+      // Update metadata immediately if reset happened
+      await client.users.updateUserMetadata(userId, {
+        publicMetadata: { ...existingPublicMetadata, imageGenerationCredits: creditsData },
+      });
     } else {
-      currentCountBeforeDecrement = creditsData.count;
+       // Ensure purchasedCredits is a number
+      if (typeof creditsData.purchasedCredits !== 'number') {
+        creditsData.purchasedCredits = 0;
+      }
+      if (typeof creditsData.freeCredits !== 'number') {
+        creditsData.freeCredits = 0; // Should be MAX_FREE_CREDITS_PER_MONTH if reset, but as a fallback
+      }
     }
 
-    if (currentCountBeforeDecrement <= 0) {
-      // This should ideally be caught by the UI before calling this action
-      // but as a safeguard:
-      // Update metadata to ensure it reflects 0 for the current month if it was a reset scenario
-       if (!creditsData || creditsData.resetMonthYear !== currentMonthYear) {
-         await client.users.updateUserMetadata(userId, {
-            publicMetadata: {
-              ...existingPublicMetadata,
-              imageGenerationCredits: { count: 0, resetMonthYear: currentMonthYear },
-            },
-          });
-       }
-      throw new Error('No image generation credits remaining for this month.');
+
+    let newFreeCredits = creditsData.freeCredits;
+    let newPurchasedCredits = creditsData.purchasedCredits;
+
+    if (newPurchasedCredits > 0) {
+      newPurchasedCredits -= 1;
+    } else if (newFreeCredits > 0) {
+      newFreeCredits -= 1;
+    } else {
+      throw new Error('No image generation credits remaining.');
     }
 
-    const newCount = currentCountBeforeDecrement - 1;
-    const newCreditsData: ImageGenerationCredits = {
-      count: newCount,
-      resetMonthYear: currentMonthYear,
+    const newCreditsData: ImageGenerationCreditsMetadata = {
+      freeCredits: newFreeCredits,
+      freeCreditsResetMonthYear: currentMonthYear, // Ensure this is current
+      purchasedCredits: newPurchasedCredits,
     };
 
     await client.users.updateUserMetadata(userId, {
@@ -112,12 +138,9 @@ export async function recordImageGenerationAndUpdateCredits(): Promise<number> {
       },
     });
 
-    return newCount;
+    return newFreeCredits + newPurchasedCredits;
   } catch (error) {
     console.error('Error recording image generation and updating credits:', error);
-    // If an error occurs during decrement, it's safer to assume the credit was not used
-    // Re-fetch to get the most accurate count or return a state indicating error.
-    // For simplicity, we'll re-throw, and client can re-fetch or handle.
     if (error instanceof Error && error.message.includes('No image generation credits')) {
         throw error;
     }
@@ -125,6 +148,57 @@ export async function recordImageGenerationAndUpdateCredits(): Promise<number> {
   }
 }
 
-// Helper to ensure the types are correctly inferred by components using these actions
+/**
+ * Adds purchased credits to the user's account.
+ * @param userId The ID of the user.
+ * @param creditsToAdd The number of credits purchased.
+ */
+export async function addPurchasedCredits(userId: string, creditsToAdd: number): Promise<ImageGenerationCreditsMetadata> {
+  if (!userId) {
+    throw new Error('User ID is required to add purchased credits.');
+  }
+  if (creditsToAdd <= 0) {
+    throw new Error('Number of credits to add must be positive.');
+  }
+
+  const client = await clerkClient();
+  try {
+    const user: User = await client.users.getUser(userId);
+    const currentMonthYear = getCurrentMonthYear();
+    const existingPublicMetadata = user.publicMetadata || {};
+    let creditsData = existingPublicMetadata?.imageGenerationCredits as ImageGenerationCreditsMetadata | undefined;
+
+    if (!creditsData) {
+      creditsData = {
+        freeCredits: MAX_FREE_CREDITS_PER_MONTH, // Initialize free credits if first time
+        freeCreditsResetMonthYear: currentMonthYear,
+        purchasedCredits: 0,
+      };
+    }
+
+    // Ensure purchasedCredits is a number, default to 0 if not
+    const currentPurchased = typeof creditsData.purchasedCredits === 'number' ? creditsData.purchasedCredits : 0;
+
+    const newCreditsData: ImageGenerationCreditsMetadata = {
+      freeCredits: creditsData.freeCredits || MAX_FREE_CREDITS_PER_MONTH,
+      freeCreditsResetMonthYear: creditsData.freeCreditsResetMonthYear || currentMonthYear,
+      purchasedCredits: currentPurchased + creditsToAdd,
+    };
+
+    await client.users.updateUserMetadata(userId, {
+      publicMetadata: {
+        ...existingPublicMetadata,
+        imageGenerationCredits: newCreditsData,
+      },
+    });
+    return newCreditsData;
+  } catch (error) {
+    console.error(`Error adding purchased credits for user ${userId}:`, error);
+    throw new Error('Failed to add purchased credits.');
+  }
+}
+
+// Helper types for actions
 export type GetImageGenerationCreditsAction = typeof getImageGenerationCredits;
 export type RecordImageGenerationAndUpdateCreditsAction = typeof recordImageGenerationAndUpdateCredits;
+export type AddPurchasedCreditsAction = typeof addPurchasedCredits;
