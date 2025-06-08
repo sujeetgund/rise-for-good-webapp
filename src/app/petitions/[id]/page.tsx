@@ -1,16 +1,18 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { getMockPetitionById, mockSupporters } from '@/lib/mock-data';
+import { getPetitionByIdFromDb } from '@/actions/initiative-actions'; // Updated import
+import { mockSupporters } from '@/lib/mock-data'; // Keep for recent supporters UI for now
 import type { Petition } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Target, CalendarDays, Edit3, Share2, AlertTriangle } from 'lucide-react';
+import { Users, Target, CalendarDays, Edit3, Share2, AlertTriangle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function PetitionDetailPage() {
@@ -19,42 +21,57 @@ export default function PetitionDetailPage() {
   const { toast } = useToast();
   const [petition, setPetition] = useState<Petition | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [hasSigned, setHasSigned] = useState(false);
+  const [hasSigned, setHasSigned] = useState(false); // Client-side state for signing
 
   useEffect(() => {
-    if (id) {
-      // Simulate API call
-      setTimeout(() => {
-        const foundPetition = getMockPetitionById(id as string);
-        setPetition(foundPetition || null);
-        setIsLoading(false);
-      }, 500);
+    if (id && typeof id === 'string') {
+      const fetchPetition = async () => {
+        setIsLoading(true);
+        try {
+          const foundPetition = await getPetitionByIdFromDb(id as string);
+          setPetition(foundPetition);
+        } catch (error) {
+          console.error("Failed to fetch petition:", error);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Could not load the petition details.",
+          });
+          setPetition(null); // Ensure petition is null on error
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchPetition();
+    } else {
+      // Handle cases where id is not a string or is missing, though Next.js routing should ensure it
+      setIsLoading(false);
+      setPetition(null);
+      toast({
+        variant: "destructive",
+        title: "Invalid Petition ID",
+        description: "The petition ID is missing or invalid.",
+      });
     }
-  }, [id]);
+  }, [id, toast]);
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8 animate-pulse">
-        <div className="h-96 bg-muted rounded-lg mb-8"></div>
-        <div className="h-10 w-3/4 bg-muted rounded mb-4"></div>
-        <div className="h-6 w-1/2 bg-muted rounded mb-6"></div>
-        <div className="space-y-4">
-          <div className="h-4 bg-muted rounded"></div>
-          <div className="h-4 bg-muted rounded w-5/6"></div>
-          <div className="h-4 bg-muted rounded w-4/6"></div>
-        </div>
+      <div className="flex justify-center items-center min-h-[calc(100vh-10rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }
 
   if (!petition) {
-    return <div className="text-center py-20 text-xl text-muted-foreground">Petition not found.</div>;
+    return <div className="text-center py-20 text-xl text-muted-foreground">Petition not found or could not be loaded.</div>;
   }
   
-  const progressValue = (petition.supporters / petition.goal) * 100;
+  const progressValue = petition.goal > 0 ? (petition.supporters / petition.goal) * 100 : 0;
 
   const handleSignPetition = () => {
-    if (!hasSigned) {
+    if (!hasSigned && petition) {
+      // Simulate client-side update. Real signing would involve a server action.
       setPetition(prev => prev ? { ...prev, supporters: prev.supporters + 1 } : null);
       setHasSigned(true);
       toast({
@@ -148,7 +165,7 @@ export default function PetitionDetailPage() {
               <CardTitle className="text-xl">Recent Supporters</CardTitle>
             </CardHeader>
             <CardContent className="max-h-96 overflow-y-auto space-y-3">
-              {mockSupporters.slice(0, 10).map(supporter => (
+              {mockSupporters.slice(0, 10).map(supporter => ( // Still using mock supporters for UI example
                 <div key={supporter.id} className="flex items-center p-2 bg-secondary rounded-md">
                   <Avatar className="h-10 w-10 mr-3 border-2 border-primary/50">
                     <AvatarImage src={supporter.avatarUrl} alt={supporter.name} data-ai-hint="person user" />

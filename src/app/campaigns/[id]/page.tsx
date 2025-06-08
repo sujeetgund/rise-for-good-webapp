@@ -1,17 +1,19 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { getMockCampaignById, mockSupporters } from '@/lib/mock-data';
+import { getCampaignByIdFromDb } from '@/actions/initiative-actions'; // Updated import
+import { mockSupporters } from '@/lib/mock-data'; // Keep for recent donors UI for now
 import type { Campaign } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, Users, Target, CalendarDays, BadgeCheck, Share2, AlertTriangle } from 'lucide-react';
+import { DollarSign, Users, Target, CalendarDays, BadgeCheck, Share2, AlertTriangle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function CampaignDetailPage() {
@@ -21,53 +23,67 @@ export default function CampaignDetailPage() {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [donationAmount, setDonationAmount] = useState('');
-  const [isDonating, setIsDonating] = useState(false);
+  const [isDonating, setIsDonating] = useState(false); // Client-side state for donation processing
 
   useEffect(() => {
-    if (id) {
-      // Simulate API call
-      setTimeout(() => {
-        const foundCampaign = getMockCampaignById(id as string);
-        setCampaign(foundCampaign || null);
-        setIsLoading(false);
-      }, 500);
+    if (id && typeof id === 'string') {
+      const fetchCampaign = async () => {
+        setIsLoading(true);
+        try {
+          const foundCampaign = await getCampaignByIdFromDb(id as string);
+          setCampaign(foundCampaign);
+        } catch (error) {
+          console.error("Failed to fetch campaign:", error);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Could not load the campaign details.",
+          });
+          setCampaign(null); // Ensure campaign is null on error
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchCampaign();
+    } else {
+      setIsLoading(false);
+      setCampaign(null);
+      toast({
+        variant: "destructive",
+        title: "Invalid Campaign ID",
+        description: "The campaign ID is missing or invalid.",
+      });
     }
-  }, [id]);
+  }, [id, toast]);
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8 animate-pulse">
-        <div className="h-96 bg-muted rounded-lg mb-8"></div>
-        <div className="h-10 w-3/4 bg-muted rounded mb-4"></div>
-        <div className="h-6 w-1/2 bg-muted rounded mb-6"></div>
-        <div className="space-y-4">
-          <div className="h-4 bg-muted rounded"></div>
-          <div className="h-4 bg-muted rounded w-5/6"></div>
-          <div className="h-4 bg-muted rounded w-4/6"></div>
-        </div>
+      <div className="flex justify-center items-center min-h-[calc(100vh-10rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }
 
   if (!campaign) {
-    return <div className="text-center py-20 text-xl text-muted-foreground">Campaign not found.</div>;
+    return <div className="text-center py-20 text-xl text-muted-foreground">Campaign not found or could not be loaded.</div>;
   }
 
-  const progressValue = (campaign.raisedAmount / campaign.goalAmount) * 100;
+  const progressValue = campaign.goalAmount > 0 ? (campaign.raisedAmount / campaign.goalAmount) * 100 : 0;
 
   const handleDonate = async () => {
+    if (!campaign) return;
     const amount = parseFloat(donationAmount);
     if (isNaN(amount) || amount <= 0) {
       toast({ variant: "destructive", title: "Invalid Amount", description: "Please enter a valid donation amount." });
       return;
     }
     setIsDonating(true);
-    // Simulate donation processing
+    // Simulate donation processing. Real donation would involve a server action & payment integration.
     await new Promise(resolve => setTimeout(resolve, 1500));
     setCampaign(prev => prev ? { 
       ...prev, 
       raisedAmount: prev.raisedAmount + amount,
-      donors: prev.donors + 1,
+      donors: prev.donors + 1, // Mapped from donorsCount
     } : null);
     setDonationAmount('');
     setIsDonating(false);
@@ -161,7 +177,7 @@ export default function CampaignDetailPage() {
                   aria-label="Donation amount"
                 />
                 <Button onClick={handleDonate} disabled={isDonating} size="lg" className="w-full bg-primary text-primary-foreground btn-glow-primary">
-                  {isDonating ? 'Processing...' : 'Donate Now'}
+                  {isDonating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Donate Now'}
                 </Button>
                 <Button onClick={handleShare} variant="outline" size="lg" className="w-full btn-glow-accent hover:border-accent">
                   <Share2 className="mr-2 h-5 w-5"/> Share
@@ -175,7 +191,7 @@ export default function CampaignDetailPage() {
               <CardTitle className="text-xl">Recent Donors</CardTitle>
             </CardHeader>
             <CardContent className="max-h-80 overflow-y-auto space-y-3">
-              {mockSupporters.slice(0, 10).map(supporter => ( // Using mockSupporters as donors for example
+              {mockSupporters.slice(0, 10).map(supporter => ( // Still using mock supporters for UI example
                 <div key={supporter.id} className="flex items-center p-2 bg-secondary rounded-md">
                   <Avatar className="h-10 w-10 mr-3 border-2 border-primary/50">
                     <AvatarImage src={supporter.avatarUrl} alt={supporter.name} data-ai-hint="person user" />

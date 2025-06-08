@@ -7,13 +7,17 @@ import { motion } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { mockPetitions, mockCampaigns } from '@/lib/mock-data'; // Assuming user specific data would be fetched
+import { mockCampaigns as mockSupportedCampaigns } from '@/lib/mock-data'; // Renamed for clarity
 import { InitiativeCard } from '@/components/shared/initiative-card';
 import { InitiativeType } from '@/types';
-import { ListChecks, HandHeart, DollarSign, Settings, Loader2, LogOut, CreditCard, AlertCircle, ShoppingBag } from 'lucide-react';
+import type * as types from '@/types'; // Import all types for mapping
+import { ListChecks, HandHeart, DollarSign, Settings, Loader2, LogOut, CreditCard, AlertCircle, ShoppingBag, Megaphone } from 'lucide-react';
 import Image from 'next/image';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { getImageGenerationCredits } from '@/actions/user-credits';
+import { getUserPetitionsByAuthorId, getUserCampaignsByOrganizerId } from '@/actions/initiative-actions'; 
+import type { IPetition } from '@/models/Petition';
+import type { ICampaign } from '@/models/Campaign';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -27,9 +31,17 @@ export default function ProfilePage() {
   const [isLoadingCredits, setIsLoadingCredits] = useState(false);
   const [creditError, setCreditError] = useState<string | null>(null);
 
+  const [userCreatedPetitions, setUserCreatedPetitions] = useState<IPetition[] | null>(null);
+  const [isLoadingUserPetitions, setIsLoadingUserPetitions] = useState(false);
+  const [userPetitionsError, setUserPetitionsError] = useState<string | null>(null);
+
+  const [userCreatedCampaigns, setUserCreatedCampaigns] = useState<ICampaign[] | null>(null);
+  const [isLoadingUserCampaigns, setIsLoadingUserCampaigns] = useState(false);
+  const [userCampaignsError, setUserCampaignsError] = useState<string | null>(null);
+
+
   // Mock data - in a real app, this would be fetched based on the logged-in user
-  const userPetitions = mockPetitions.filter(p => p.author.id === 'user1').slice(0,2); // Example
-  const supportedCampaigns = mockCampaigns.filter(c => c.id === 'camp1' || c.id === 'camp2').slice(0,2); // Example
+  const supportedCampaigns = mockSupportedCampaigns.filter(c => c.id === 'camp1' || c.id === 'camp2').slice(0,2); // Example
   const donationHistory = [
     { id: 'don1', campaignTitle: 'Clean Water for Rural Villages', amount: 50, date: new Date(2024, 3, 10).toISOString() },
     { id: 'don2', campaignTitle: 'Tech Kits for Underprivileged Students', amount: 25, date: new Date(2024, 4, 22).toISOString() },
@@ -46,20 +58,45 @@ export default function ProfilePage() {
         } catch (error) {
           console.error("Failed to fetch image credits on profile:", error);
           setCreditError("Could not load credits.");
-          // toast({ // Toast is already handled in create-initiative-form, avoid double toast
-          //   variant: "destructive",
-          //   title: "Error",
-          //   description: "Failed to fetch image generation credits.",
-          // });
         } finally {
           setIsLoadingCredits(false);
         }
       };
       fetchCredits();
+
+      const fetchUserPetitions = async () => {
+        setIsLoadingUserPetitions(true);
+        setUserPetitionsError(null);
+        try {
+          const petitions = await getUserPetitionsByAuthorId(user.id);
+          setUserCreatedPetitions(petitions);
+        } catch (error) {
+          console.error("Failed to fetch user petitions:", error);
+          setUserPetitionsError(error instanceof Error ? error.message : "Could not load your petitions.");
+        } finally {
+          setIsLoadingUserPetitions(false);
+        }
+      };
+      fetchUserPetitions();
+
+      const fetchUserCampaigns = async () => {
+        setIsLoadingUserCampaigns(true);
+        setUserCampaignsError(null);
+        try {
+          const campaigns = await getUserCampaignsByOrganizerId(user.id);
+          setUserCreatedCampaigns(campaigns);
+        } catch (error) {
+          console.error("Failed to fetch user campaigns:", error);
+          setUserCampaignsError(error instanceof Error ? error.message : "Could not load your campaigns.");
+        } finally {
+          setIsLoadingUserCampaigns(false);
+        }
+      };
+      fetchUserCampaigns();
     }
   }, [user, isLoaded]);
 
-  if (!isLoaded || (user && isLoadingCredits && totalImageCredits === null) ) {
+  if (!isLoaded || (user && (isLoadingCredits || isLoadingUserPetitions || isLoadingUserCampaigns)) ) {
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-10rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -68,9 +105,63 @@ export default function ProfilePage() {
   }
 
   if (!user) {
-    // This case should ideally be handled by middleware, but as a fallback:
     return <div className="text-center py-20">Please log in to view your profile.</div>;
   }
+
+  const mapDbPetitionToCardPetition = (dbPetition: IPetition): types.Petition => {
+    const id = typeof dbPetition._id === 'string' ? dbPetition._id : (dbPetition._id as any)?.toString();
+    const createdAt = dbPetition.createdAt instanceof Date ? dbPetition.createdAt.toISOString() : (typeof dbPetition.createdAt === 'string' ? dbPetition.createdAt : new Date().toISOString());
+
+    return {
+      id: id,
+      title: dbPetition.title,
+      description: dbPetition.description,
+      imageUrl: dbPetition.imageUrl,
+      category: dbPetition.category,
+      author: {
+        id: user.id,
+        username: user.username || user.fullName || 'User',
+        avatarUrl: user.imageUrl,
+        email: user.primaryEmailAddress?.emailAddress || '',
+        createdAt: user.createdAt?.toISOString() || new Date().toISOString(),
+      },
+      supporters: dbPetition.supportersCount,
+      goal: dbPetition.goal,
+      createdAt: createdAt,
+      location: dbPetition.location,
+      status: dbPetition.status,
+      contentWarning: dbPetition.contentWarning,
+    };
+  };
+
+  const mapDbCampaignToCardCampaign = (dbCampaign: ICampaign): types.Campaign => {
+    const id = typeof dbCampaign._id === 'string' ? dbCampaign._id : (dbCampaign._id as any)?.toString();
+    const createdAt = dbCampaign.createdAt instanceof Date ? dbCampaign.createdAt.toISOString() : (typeof dbCampaign.createdAt === 'string' ? dbCampaign.createdAt : new Date().toISOString());
+
+    return {
+      id: id,
+      title: dbCampaign.title,
+      description: dbCampaign.description,
+      imageUrl: dbCampaign.imageUrl,
+      category: dbCampaign.category,
+      organizer: {
+        id: user.id,
+        username: user.username || user.fullName || 'User',
+        avatarUrl: user.imageUrl,
+        email: user.primaryEmailAddress?.emailAddress || '',
+        createdAt: user.createdAt?.toISOString() || new Date().toISOString(),
+      },
+      raisedAmount: dbCampaign.raisedAmount,
+      goalAmount: dbCampaign.goalAmount,
+      donors: dbCampaign.donorsCount,
+      createdAt: createdAt,
+      location: dbCampaign.location,
+      status: dbCampaign.status,
+      isVerified: dbCampaign.isVerified,
+      contentWarning: dbCampaign.contentWarning,
+    };
+  };
+
 
   return (
     <motion.div
@@ -129,25 +220,32 @@ export default function ProfilePage() {
             "bg-card border-b border-border rounded-none",
             isMobile 
             ? "flex w-full overflow-x-auto no-scrollbar flex-nowrap px-2" 
-            : "grid w-full grid-cols-4"
+            : "grid w-full grid-cols-5" // Changed from grid-cols-4 to grid-cols-5
           )}
         >
           <TabsTrigger 
             value="petitions" 
             className={cn(
               "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md",
-              "text-sm px-3 py-2.5 flex-shrink-0 flex items-center gap-1.5 whitespace-nowrap",
-              isMobile ? "text-xs" : ""
+              "text-sm px-3 py-2.5 flex-shrink-0 flex items-center gap-1.5 whitespace-nowrap"
             )}
           >
             <ListChecks className={cn("h-4 w-4")} /> My Petitions
           </TabsTrigger>
           <TabsTrigger 
-            value="campaigns" 
+            value="my-campaigns" 
             className={cn(
               "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md",
-              "text-sm px-3 py-2.5 flex-shrink-0 flex items-center gap-1.5 whitespace-nowrap",
-               isMobile ? "text-xs" : ""
+              "text-sm px-3 py-2.5 flex-shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+            )}
+          >
+            <Megaphone className={cn("h-4 w-4")} /> My Campaigns
+          </TabsTrigger>
+          <TabsTrigger 
+            value="supported-initiatives" 
+            className={cn(
+              "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md",
+              "text-sm px-3 py-2.5 flex-shrink-0 flex items-center gap-1.5 whitespace-nowrap"
             )}
           >
             <HandHeart className={"h-4 w-4"} /> Supported Initiatives
@@ -156,8 +254,7 @@ export default function ProfilePage() {
             value="donations" 
             className={cn(
               "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md",
-              "text-sm px-3 py-2.5 flex-shrink-0 flex items-center gap-1.5 whitespace-nowrap",
-               isMobile ? "text-xs" : ""
+              "text-sm px-3 py-2.5 flex-shrink-0 flex items-center gap-1.5 whitespace-nowrap"
             )}
           >
             <DollarSign className={"h-4 w-4"} /> Donation History
@@ -182,20 +279,64 @@ export default function ProfilePage() {
               <CardDescription>Petitions you have started.</CardDescription>
             </CardHeader>
             <CardContent>
-              {userPetitions.length > 0 ? (
-                <div className="grid md:grid-cols-2 gap-6">
-                  {userPetitions.map(p => <InitiativeCard key={p.id} item={p} type={InitiativeType.Petition} />)}
+              {isLoadingUserPetitions && (
+                <div className="flex justify-center items-center py-10">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
-              ) : <p className="text-muted-foreground">You haven't created any petitions yet.</p>}
+              )}
+              {userPetitionsError && !isLoadingUserPetitions && (
+                <p className="text-destructive text-center py-10">{userPetitionsError}</p>
+              )}
+              {!isLoadingUserPetitions && !userPetitionsError && userCreatedPetitions && userCreatedPetitions.length > 0 ? (
+                <div className="grid md:grid-cols-2 gap-6">
+                  {userCreatedPetitions.map(dbPetition => {
+                    const cardPetition = mapDbPetitionToCardPetition(dbPetition);
+                    return <InitiativeCard key={cardPetition.id} item={cardPetition} type={InitiativeType.Petition} />;
+                  })}
+                </div>
+              ) : null}
+              {!isLoadingUserPetitions && !userPetitionsError && (!userCreatedPetitions || userCreatedPetitions.length === 0) && (
+                 <p className="text-muted-foreground text-center py-10">You haven't created any petitions yet.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="campaigns" className="mt-6">
+        <TabsContent value="my-campaigns" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>My Created Campaigns</CardTitle>
+              <CardDescription>Fundraising campaigns you have organized.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingUserCampaigns && (
+                <div className="flex justify-center items-center py-10">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              )}
+              {userCampaignsError && !isLoadingUserCampaigns && (
+                <p className="text-destructive text-center py-10">{userCampaignsError}</p>
+              )}
+              {!isLoadingUserCampaigns && !userCampaignsError && userCreatedCampaigns && userCreatedCampaigns.length > 0 ? (
+                <div className="grid md:grid-cols-2 gap-6">
+                  {userCreatedCampaigns.map(dbCampaign => {
+                    const cardCampaign = mapDbCampaignToCardCampaign(dbCampaign);
+                    return <InitiativeCard key={cardCampaign.id} item={cardCampaign} type={InitiativeType.Campaign} />;
+                  })}
+                </div>
+              ) : null}
+              {!isLoadingUserCampaigns && !userCampaignsError && (!userCreatedCampaigns || userCreatedCampaigns.length === 0) && (
+                 <p className="text-muted-foreground text-center py-10">You haven't created any campaigns yet.</p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="supported-initiatives" className="mt-6">
           <Card>
             <CardHeader>
               <CardTitle>Supported Initiatives</CardTitle>
-              <CardDescription>Campaigns and petitions you have supported or donated to.</CardDescription>
+              <CardDescription>Campaigns and petitions you have supported or donated to. (Mock data)</CardDescription>
             </CardHeader>
             <CardContent>
               {supportedCampaigns.length > 0 ? (
@@ -211,7 +352,7 @@ export default function ProfilePage() {
           <Card>
             <CardHeader>
               <CardTitle>Donation History</CardTitle>
-              <CardDescription>A record of your contributions.</CardDescription>
+              <CardDescription>A record of your contributions. (Mock data)</CardDescription>
             </CardHeader>
             <CardContent>
               {donationHistory.length > 0 ? (
