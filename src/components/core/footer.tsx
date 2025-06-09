@@ -1,3 +1,6 @@
+
+import Link from "next/link";
+
 export function Footer() {
   return (
     <footer className="bg-secondary text-secondary-foreground py-8 mt-12">
@@ -7,9 +10,9 @@ export function Footer() {
           &copy; {new Date().getFullYear()} RiseForGood. All rights reserved.
         </p>
         <div className="mt-4 space-x-4">
-          <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
-          <a href="#" className="hover:text-primary transition-colors">Terms of Service</a>
-          <a href="#" className="hover:text-primary transition-colors">Contact Us</a>
+          <Link href="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+          <Link href="/terms-of-service" className="hover:text-primary transition-colors">Terms of Service</Link>
+          <Link href="/contact" className="hover:text-primary transition-colors">Contact Us</Link>
         </div>
       </div>
     </footer>
