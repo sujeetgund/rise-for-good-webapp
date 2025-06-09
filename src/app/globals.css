@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -97,5 +98,73 @@ body {
   .no-scrollbar {
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
+  }
+
+  .global-background-animation {
+    position: fixed;
+    inset: 0;
+    z-index: -10; /* Positioned behind all page content */
+    pointer-events: none; /* Allows clicks to pass through */
+    overflow: hidden; /* Clips the spheres if they animate outside bounds */
+  }
+
+  .global-background-animation::before,
+  .global-background-animation::after {
+    content: "";
+    position: absolute; /* Relative to the fixed .global-background-animation div */
+    border-radius: 50%;
+    opacity: 0; /* Initial opacity, animation will take over */
+    will-change: transform, opacity; /* Performance hint for animations */
+  }
+
+  .global-background-animation::before {
+    width: 700px;
+    height: 700px;
+    left: 5%;  /* Positioned towards top-left */
+    top: 5%;
+    background: radial-gradient(circle, hsla(var(--primary), 0.5) 0%, hsla(var(--primary), 0.25) 50%, hsla(var(--background), 0) 75%);
+    filter: blur(100px);
+    animation: subtle-trending-glow 30s infinite alternate ease-in-out;
+  }
+
+  .global-background-animation::after {
+    width: 600px;
+    height: 600px;
+    right: 5%; /* Positioned towards bottom-right */
+    bottom: 5%;
+    background: radial-gradient(circle, hsla(var(--accent), 0.45) 0%, hsla(var(--accent), 0.2) 50%, hsla(var(--background), 0) 75%);
+    filter: blur(90px);
+    animation: subtle-trending-glow-alt 35s infinite alternate ease-in-out;
+    animation-delay: -15s; /* Stagger the animations */
+  }
+}
+ 
+@keyframes subtle-trending-glow {
+  0% {
+    transform: scale(0.7) translate(-30vw, -30vh) rotate(0deg);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scale(1.1) translate(20vw, 25vh) rotate(180deg);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(0.7) translate(-30vw, -30vh) rotate(360deg);
+    opacity: 0.35;
+  }
+}
+
+@keyframes subtle-trending-glow-alt {
+  0% {
+    transform: scale(0.8) translate(25vw, 30vh) rotate(0deg);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.2) translate(-20vw, -20vh) rotate(-180deg);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(0.8) translate(25vw, 30vh) rotate(-360deg);
+    opacity: 0.3;
   }
 }

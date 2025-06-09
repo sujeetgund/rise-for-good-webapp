@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -8,9 +9,11 @@ import type { Petition, Campaign } from '@/types';
 import { InitiativeType } from '@/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Flame } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export function TrendingInitiatives() {
-  const [activeTab, setActiveTab] = useState<'petitions' | 'campaigns'>('petitions');
+  // No longer need activeTab state for styling, Tabs component handles data-state
+  // const [activeTab, setActiveTab] = useState<'petitions' | 'campaigns'>('petitions');
 
   // Get top 3 trending items (mocked)
   const trendingPetitions = mockPetitions.slice(0, 3);
@@ -31,8 +34,19 @@ export function TrendingInitiatives() {
     visible: { opacity: 1, y: 0 },
   };
 
+  const tabsTriggerStyles = cn(
+    "px-6 py-2.5 text-sm font-medium rounded-full transition-all duration-300 ease-in-out",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-background",
+    "flex-shrink-0",
+    // Inactive state
+    "text-accent hover:bg-accent hover:text-accent-foreground",
+    // Active state (leveraging data-state attribute from TabsTrigger)
+    "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md"
+  );
+
+
   return (
-    <section className="py-16 md:py-24 bg-secondary rounded-lg mt-16 md:mt-24">
+    <section className="relative py-16 md:py-24 rounded-lg overflow-hidden">
       <div className="container mx-auto px-4">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -48,10 +62,20 @@ export function TrendingInitiatives() {
           </p>
         </motion.div>
 
-        <Tabs defaultValue="petitions" className="w-full" onValueChange={(value) => setActiveTab(value as 'petitions' | 'campaigns')}>
-          <TabsList className="grid w-full grid-cols-2 md:w-1/2 mx-auto mb-8">
-            <TabsTrigger value="petitions" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Petitions</TabsTrigger>
-            <TabsTrigger value="campaigns" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Campaigns</TabsTrigger>
+        <Tabs defaultValue="petitions" className="w-full">
+          <TabsList className="bg-secondary rounded-full inline-flex mx-auto mb-10 shadow-inner gap-2">
+            <TabsTrigger 
+              value="petitions"
+              className={tabsTriggerStyles}
+            >
+              Petitions
+            </TabsTrigger>
+            <TabsTrigger 
+              value="campaigns"
+              className={tabsTriggerStyles}
+            >
+              Campaigns
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="petitions">
             <motion.div

@@ -217,17 +217,19 @@ export default function ProfilePage() {
       <Tabs defaultValue="petitions" className="w-full">
         <TabsList 
           className={cn(
-            "bg-card border-b border-border rounded-none",
+            "bg-muted p-1 rounded-lg", 
             isMobile 
-            ? "flex w-full overflow-x-auto no-scrollbar flex-nowrap px-2" 
-            : "grid w-full grid-cols-5" // Changed from grid-cols-4 to grid-cols-5
+            ? "flex w-full overflow-x-auto no-scrollbar flex-nowrap gap-1 items-center h-12" 
+            : "grid w-full grid-cols-5 gap-1 items-center h-12" 
           )}
         >
           <TabsTrigger 
             value="petitions" 
             className={cn(
-              "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md",
-              "text-sm px-3 py-2.5 flex-shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+              "rounded-md transition-colors duration-150", 
+              "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md", 
+              "text-muted-foreground hover:text-foreground hover:bg-muted/60", 
+              "text-sm px-3 py-2.5 flex-shrink-0 flex items-center gap-1.5 whitespace-nowrap" 
             )}
           >
             <ListChecks className={cn("h-4 w-4")} /> My Petitions
@@ -235,7 +237,9 @@ export default function ProfilePage() {
           <TabsTrigger 
             value="my-campaigns" 
             className={cn(
+              "rounded-md transition-colors duration-150",
               "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md",
+              "text-muted-foreground hover:text-foreground hover:bg-muted/60",
               "text-sm px-3 py-2.5 flex-shrink-0 flex items-center gap-1.5 whitespace-nowrap"
             )}
           >
@@ -244,7 +248,9 @@ export default function ProfilePage() {
           <TabsTrigger 
             value="supported-initiatives" 
             className={cn(
+              "rounded-md transition-colors duration-150",
               "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md",
+              "text-muted-foreground hover:text-foreground hover:bg-muted/60",
               "text-sm px-3 py-2.5 flex-shrink-0 flex items-center gap-1.5 whitespace-nowrap"
             )}
           >
@@ -253,7 +259,9 @@ export default function ProfilePage() {
           <TabsTrigger 
             value="donations" 
             className={cn(
+              "rounded-md transition-colors duration-150",
               "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md",
+              "text-muted-foreground hover:text-foreground hover:bg-muted/60",
               "text-sm px-3 py-2.5 flex-shrink-0 flex items-center gap-1.5 whitespace-nowrap"
             )}
           >
@@ -263,7 +271,9 @@ export default function ProfilePage() {
             <TabsTrigger 
               value="settings" 
               className={cn(
+                "rounded-md transition-colors duration-150",
                 "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md",
+                "text-muted-foreground hover:text-foreground hover:bg-muted/60",
                 "text-sm px-3 py-2.5 flex-shrink-0 flex items-center gap-1.5 whitespace-nowrap"
               )}
             >
@@ -392,3 +402,4 @@ export default function ProfilePage() {
     </motion.div>
   );
 }
+

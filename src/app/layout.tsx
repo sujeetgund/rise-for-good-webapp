@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
 import { Geist, Geist_Mono } from 'next/font/google'; // Corrected import, Geist is default export
@@ -52,11 +53,12 @@ export default function RootLayout({
     >
       <html lang="en">
         <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased flex flex-col min-h-screen`}>
+          <div className="global-background-animation" />
           <Navbar />
-          <main className="flex-grow container mx-auto px-4">
+          <main className="flex-grow container mx-auto px-4 relative z-1"> {/* Ensure main content is above fixed background */}
             {children}
           </main>
-          <Footer />
+          <Footer /> {/* Footer might need position: relative and z-index:1 if global bg animations are used and footer has transparent bg */}
           <Toaster />
         </body>
       </html>

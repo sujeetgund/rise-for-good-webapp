@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -21,8 +22,8 @@ export function HeroSection() {
   }, []);
 
   return (
-    <section className="py-20 md:py-32 text-center bg-gradient-to-br from-background to-secondary rounded-lg shadow-xl overflow-hidden">
-      <div className="container mx-auto px-4">
+    <section className="relative py-20 md:py-32 text-center rounded-lg overflow-hidden">
+      <div className="relative z-1"> {/* Ensure content is above any potential pseudo-element if re-added */}
         <AnimatePresence mode="wait">
           <motion.h1
             key={currentMessageIndex}
