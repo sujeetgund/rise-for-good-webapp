@@ -10,6 +10,7 @@ export interface IPetition {
   goal: number;
   supportersCount: number;
   imageUrl?: string; // Cloudinary URL
+  imagePublicId?: string;
   location?: string;
   status: 'active' | 'completed' | 'draft';
   contentWarning?: string;
@@ -22,12 +23,13 @@ export interface IPetitionDocument extends Omit<IPetition, '_id' | 'createdAt' |
 const PetitionSchema: Schema<IPetitionDocument> = new Schema(
   {
     title: { type: String, required: true, trim: true, maxlength: 150 },
-    description: { type: String, required: true, trim: true, maxlength: 5000 },
+    description: { type: String, required: true, trim: true, maxlength: 50000 },
     category: { type: String, required: true },
     authorId: { type: String, required: true, index: true },
     goal: { type: Number, required: true, min: 1 },
     supportersCount: { type: Number, default: 0 },
     imageUrl: { type: String, trim: true },
+    imagePublicId: { type: String },
     location: { type: String, trim: true },
     status: {
       type: String,

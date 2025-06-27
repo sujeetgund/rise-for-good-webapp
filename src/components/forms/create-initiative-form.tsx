@@ -15,7 +15,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -45,6 +44,7 @@ import Image from "next/image";
 import { Loader2, Sparkles, ImagePlus, AlertCircle, LinkIcon, Wand2, CreditCard, UploadCloud } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useUser } from "@clerk/nextjs";
+import { RichTextEditor } from "../ui/rich-text-editor";
 
 const formSchemaBase = z.object({
   title: z
@@ -54,7 +54,7 @@ const formSchemaBase = z.object({
   description: z
     .string()
     .min(20, { message: "Description must be at least 20 characters." })
-    .max(5000), // Increased max length
+    .max(50000), // Increased max length for HTML
   category: z.string().min(1, { message: "Please select a category." }),
   imageUrl: z // This will hold the dataURI or manual URL initially
     .string()
@@ -83,7 +83,7 @@ interface CreateInitiativeFormProps {
   onSubmitWithCloudinary: (
     data: CreateInitiativeFormValues,
     moderationResult: ModerateCampaignContentOutput | null,
-    cloudinaryImageUrl: string | null, // URL from Cloudinary
+    cloudinaryImage: { url: string | null; publicId: string | null },
     userId: string
   ) => Promise<void>;
 }
@@ -286,7 +286,7 @@ export function CreateInitiativeForm({
     }
     setIsSubmittingForm(true);
 
-    let finalImageUrlForDb: string | null = null;
+    let cloudinaryImage: { url: string | null; publicId: string | null } = { url: null, publicId: null };
     const imageSourceForUpload = form.getValues("imageUrl"); // This is the dataURI or manual URL
 
     if (imageSourceForUpload) {
@@ -294,7 +294,7 @@ export function CreateInitiativeForm({
         toast({ title: "Uploading Image...", description: "Please wait while your image is being uploaded." });
         const uploadResult = await uploadImageToCloudinary(imageSourceForUpload, type, values.title);
         if (uploadResult?.secure_url) {
-          finalImageUrlForDb = uploadResult.secure_url;
+          cloudinaryImage = { url: uploadResult.secure_url, publicId: uploadResult.public_id };
           toast({ title: "Image Uploaded!", description: "Image successfully uploaded to Cloudinary." });
         } else {
           toast({ variant: "destructive", title: "Image Upload Failed", description: "Could not upload image to Cloudinary. Continuing without image." });
@@ -320,10 +320,9 @@ export function CreateInitiativeForm({
     const submissionData = {
         ...values,
         contentWarning: finalContentWarning,
-        // imageUrl is already part of `values` from the form. We pass `finalImageUrlForDb` separately.
     };
 
-    await onSubmitWithCloudinary(submissionData, moderationResult, finalImageUrlForDb, user.id);
+    await onSubmitWithCloudinary(submissionData, moderationResult, cloudinaryImage, user.id);
     setIsSubmittingForm(false);
   };
   
@@ -354,7 +353,13 @@ export function CreateInitiativeForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel className="text-lg font-semibold">Description</FormLabel>
-              <FormControl><Textarea placeholder={`Describe your ${type} in detail...`} {...field} rows={8} className="text-base"/></FormControl>
+              <FormControl>
+                <RichTextEditor
+                  value={field.value}
+                  onChange={field.onChange}
+                  disabled={isSubmittingForm || isModerating || isGeneratingAIImage || isProcessingManualUrl}
+                />
+              </FormControl>
               <FormDescription>Provide all necessary information about your {type}. Be clear and persuasive.</FormDescription>
               <FormMessage />
             </FormItem>

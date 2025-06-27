@@ -18,7 +18,7 @@ export default function CreatePetitionPage() {
   const handleSubmit = async (
     data: CreateInitiativeFormValues, 
     moderationResult: ModerateCampaignContentOutput | null,
-    cloudinaryImageUrl: string | null, // URL from Cloudinary
+    cloudinaryImage: { url: string | null; publicId: string | null },
     userId: string
   ) => {
     
@@ -27,13 +27,14 @@ export default function CreatePetitionPage() {
       description: data.description,
       category: data.category,
       goal: (data as Extract<CreateInitiativeFormValues, {goal: number}>).goal, // Type assertion
-      imageUrl: cloudinaryImageUrl || undefined, // Use Cloudinary URL, or undefined if null
+      imageUrl: cloudinaryImage.url || undefined,
+      imagePublicId: cloudinaryImage.publicId || undefined,
       location: data.location,
       contentWarning: data.contentWarning,
     };
 
     try {
-      const newPetition : IPetition = await createPetitionWithDb(petitionDataForDb, userId);
+      const newPetition : IPetition = await createPetitionWithDb(petitionDataForDb as any, userId);
       toast({
         title: 'Petition Created!',
         description: `Your petition "${newPetition.title}" has been successfully created.`,

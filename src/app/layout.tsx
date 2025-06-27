@@ -30,13 +30,13 @@ export default function RootLayout({
   return (
     <ClerkProvider
       appearance={{
-        baseTheme: undefined, // Let Clerk auto-detect based on system or use path specific themes
+        // baseTheme is removed to default to Clerk's light theme, which we override with variables
         variables: {
           colorPrimary: '#E63946', // RiseForGood Primary Red
-          colorBackground: '#1D232A', // A slightly off-black for Clerk components if needed
-          colorText: '#F1FAEE',
-          colorInputBackground: '#2A303C',
-          colorInputText: '#F1FAEE',
+          colorBackground: 'hsl(0 0% 100%)', // Card background (white)
+          colorText: 'hsl(220 15% 20%)', // Foreground color
+          colorInputBackground: 'hsl(220 15% 92%)', // Input background
+          colorInputText: 'hsl(220 15% 20%)', // Foreground color
         },
         elements: {
           formButtonPrimary: 'bg-primary hover:bg-primary/90 text-primary-foreground btn-glow-primary',
@@ -52,7 +52,7 @@ export default function RootLayout({
       }}
     >
       <html lang="en">
-        <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased flex flex-col min-h-screen`}>
+        <body className={`${geistSans.variable} ${geistMono.variable} font-sans flex flex-col min-h-screen`}>
           <div className="global-background-animation" />
           <Navbar />
           <main className="flex-grow container mx-auto px-4 relative z-1"> {/* Ensure main content is above fixed background */}

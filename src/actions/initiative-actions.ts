@@ -48,7 +48,7 @@ export async function uploadImageToCloudinary(
 }
 
 // --- Petition Actions ---
-export type CreatePetitionData = Omit<IPetition, '_id' | 'authorId' | 'supportersCount' | 'status' | 'createdAt' | 'updatedAt'> & { imageUrl?: string };
+export type CreatePetitionData = Omit<IPetition, '_id' | 'authorId' | 'supportersCount' | 'status' | 'createdAt' | 'updatedAt'>;
 
 
 export async function createPetitionWithDb(
@@ -159,7 +159,7 @@ export async function getPetitionByIdFromDb(id: string): Promise<types.Petition 
 
 
 // --- Campaign Actions ---
-export type CreateCampaignData = Omit<ICampaign, '_id' | 'organizerId' | 'raisedAmount' | 'donorsCount' | 'status' | 'isVerified' | 'createdAt' | 'updatedAt'> & { imageUrl?: string };
+export type CreateCampaignData = Omit<ICampaign, '_id' | 'organizerId' | 'raisedAmount' | 'donorsCount' | 'status' | 'isVerified' | 'createdAt' | 'updatedAt'>;
 
 
 export async function createCampaignWithDb(
@@ -266,5 +266,61 @@ export async function getCampaignByIdFromDb(id: string): Promise<types.Campaign 
       return null;
     }
     throw new Error(`Failed to fetch campaign: ${error instanceof Error ? error.message : 'Unknown database error'}`);
+  }
+}
+
+export async function deleteInitiative({
+  initiativeId,
+  initiativeType,
+}: {
+  initiativeId: string;
+  initiativeType: InitiativeType;
+}): Promise<{ success: boolean; message: string }> {
+  const { userId } = auth();
+  if (!userId) {
+    throw new Error('You must be logged in to delete an initiative.');
+  }
+
+  await dbConnect();
+
+  try {
+    if (initiativeType === InitiativeType.Petition) {
+      const petition = await PetitionModel.findById(initiativeId);
+      if (!petition) {
+        throw new Error('Petition not found.');
+      }
+      if (petition.authorId !== userId) {
+        throw new Error('You are not authorized to delete this petition.');
+      }
+
+      // Delete image from Cloudinary if it exists
+      if (petition.imagePublicId) {
+        await cloudinary.uploader.destroy(petition.imagePublicId);
+      }
+      await PetitionModel.findByIdAndDelete(initiativeId);
+
+    } else { // Campaign
+      const campaign = await CampaignModel.findById(initiativeId);
+      if (!campaign) {
+        throw new Error('Campaign not found.');
+      }
+      if (campaign.organizerId !== userId) {
+        throw new Error('You are not authorized to delete this campaign.');
+      }
+      
+      // Delete image from Cloudinary if it exists
+      if (campaign.imagePublicId) {
+        await cloudinary.uploader.destroy(campaign.imagePublicId);
+      }
+      await CampaignModel.findByIdAndDelete(initiativeId);
+    }
+    
+    return { success: true, message: `${initiativeType} deleted successfully.` };
+
+  } catch (error) {
+    console.error(`Error deleting ${initiativeType}:`, error);
+    const message = error instanceof Error ? error.message : `Failed to delete ${initiativeType}.`;
+    // We throw here so react-query can catch it
+    throw new Error(message);
   }
 }

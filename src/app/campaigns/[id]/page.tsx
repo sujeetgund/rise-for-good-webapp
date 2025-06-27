@@ -138,8 +138,11 @@ export default function CampaignDetailPage() {
                 </div>
               )}
             </CardHeader>
-            <CardContent className="text-lg text-foreground leading-relaxed space-y-4">
-              <p>{campaign.description}</p>
+            <CardContent className="space-y-4">
+              <div
+                className="prose"
+                dangerouslySetInnerHTML={{ __html: campaign.description }}
+              />
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-muted-foreground pt-4 border-t border-border">
                 <div className="flex items-center"><Users className="mr-2 h-5 w-5 text-accent" />Organizer: {campaign.organizer.username}</div>
@@ -161,7 +164,7 @@ export default function CampaignDetailPage() {
             <CardContent>
               <div className="mb-4">
                 <div className="flex justify-between items-baseline mb-1">
-                  <span className="text-xl font-bold text-accent">${campaign.raisedAmount.toLocaleString()}</span>
+                  <span className="text-xl font-bold text-accent font-mono">${campaign.raisedAmount.toLocaleString()}</span>
                   <span className="text-sm text-muted-foreground">raised of ${campaign.goalAmount.toLocaleString()} goal</span>
                 </div>
                 <Progress value={progressValue} aria-label={`${progressValue.toFixed(0)}% of goal reached`} className="h-3 [&>div]:bg-gradient-to-r [&>div]:from-accent [&>div]:to-primary" />

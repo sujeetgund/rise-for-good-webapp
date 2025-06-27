@@ -11,6 +11,7 @@ export interface ICampaign {
   raisedAmount: number;
   donorsCount: number;
   imageUrl?: string; // Cloudinary URL
+  imagePublicId?: string;
   location?: string;
   status: 'active' | 'completed' | 'draft';
   isVerified: boolean;
@@ -24,13 +25,14 @@ export interface ICampaignDocument extends Omit<ICampaign, '_id' | 'createdAt' |
 const CampaignSchema: Schema<ICampaignDocument> = new Schema(
   {
     title: { type: String, required: true, trim: true, maxlength: 150 },
-    description: { type: String, required: true, trim: true, maxlength: 5000 },
+    description: { type: String, required: true, trim: true, maxlength: 50000 },
     category: { type: String, required: true },
     organizerId: { type: String, required: true, index: true },
     goalAmount: { type: Number, required: true, min: 1 },
     raisedAmount: { type: Number, default: 0 },
     donorsCount: { type: Number, default: 0 },
     imageUrl: { type: String, trim: true },
+    imagePublicId: { type: String },
     location: { type: String, trim: true },
     status: {
       type: String,

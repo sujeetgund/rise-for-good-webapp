@@ -123,8 +123,11 @@ export default function PetitionDetailPage() {
                 </div>
               )}
             </CardHeader>
-            <CardContent className="text-lg text-foreground leading-relaxed space-y-4">
-              <p>{petition.description}</p>
+            <CardContent className="space-y-4">
+               <div
+                className="prose"
+                dangerouslySetInnerHTML={{ __html: petition.description }}
+              />
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-muted-foreground pt-4 border-t border-border">
                 <div className="flex items-center"><Edit3 className="mr-2 h-5 w-5 text-accent" />Authored by: {petition.author.username}</div>
@@ -146,7 +149,7 @@ export default function PetitionDetailPage() {
             <CardContent>
               <div className="mb-4">
                 <div className="flex justify-between items-baseline mb-1">
-                  <span className="text-xl font-bold text-accent">{petition.supporters.toLocaleString()}</span>
+                  <span className="text-xl font-bold text-accent font-mono">{petition.supporters.toLocaleString()}</span>
                   <span className="text-sm text-muted-foreground">signed of {petition.goal.toLocaleString()} goal</span>
                 </div>
                 <Progress value={progressValue} aria-label={`${progressValue.toFixed(0)}% of goal reached`} className="h-3 [&>div]:bg-gradient-to-r [&>div]:from-accent [&>div]:to-primary" />

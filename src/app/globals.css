@@ -5,11 +5,52 @@
 
 body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  @apply tracking-normal;
 }
 
 @layer base {
   :root {
-    /* Dark Theme (Default) */
+    /* Light Theme (Default) */
+    --background: 220 20% 98%; /* Very Light Gray/Blue: #F9FAFB */
+    --foreground: 220 15% 20%; /* Dark Gray/Blue */
+
+    --card: 0 0% 100%; /* White */
+    --card-foreground: 220 15% 20%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 15% 20%;
+
+    --primary: 356 79% 56%; /* Saturated Red #E63946 */
+    --primary-foreground: 0 0% 98%; /* White text on red */
+
+    --secondary: 220 15% 94%; /* Light Gray */
+    --secondary-foreground: 220 15% 20%;
+
+    --muted: 220 15% 96%; /* Lighter Gray for muted elements */
+    --muted-foreground: 220 10% 45%; /* Medium gray for muted text */
+
+    --accent: 40 100% 57%; /* Muted Yellow #FFB627 */
+    --accent-foreground: 220 15% 10%; /* Dark text on yellow for contrast */
+
+    --destructive: 0 70% 50%; /* A standard red for destructive actions */
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 15% 88%; /* Light Gray Border */
+    --input: 220 15% 92%; /* Slightly darker input bg */
+    --ring: 356 79% 56%; /* Primary color for focus rings */
+
+    --radius: 0.5rem;
+
+    /* Chart colors for light theme */
+    --chart-1: 356 70% 50%; /* Red */
+    --chart-2: 40 90% 50%; /* Yellow */
+    --chart-3: 200 70% 50%; /* Blue */
+    --chart-4: 150 60% 45%; /* Green */
+    --chart-5: 280 65% 55%; /* Purple */
+  }
+
+  .dark {
+    /* Dark Theme */
     --background: 0 0% 7%; /* Near Black #121212 */
     --foreground: 0 0% 98%; /* Off-white #FAFAFA */
 
@@ -37,38 +78,13 @@ body {
     --border: 0 0% 25%; /* Darker border */
     --input: 0 0% 15%; /* Dark input background */
     --ring: 356 79% 56%; /* Primary color for focus rings */
-
-    --radius: 0.5rem;
-
+    
     /* Chart colors (can be adjusted if needed for better dark theme visibility) */
     --chart-1: 356 79% 66%; /* Lighter Red */
     --chart-2: 40 100% 67%; /* Lighter Yellow */
     --chart-3: 200 80% 60%; /* A contrasting blue */
     --chart-4: 150 70% 55%; /* A contrasting green */
     --chart-5: 280 75% 65%; /* A contrasting purple */
-  }
-
-  .light-theme { 
-    /* Optional Light Theme Definition */
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 356 79% 56%; /* Saturated Red */
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 40 100% 57%; /* Muted Yellow */
-    --accent-foreground: 0 0% 7%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 356 79% 56%;
   }
 }
 
@@ -78,7 +94,7 @@ body {
   }
   body {
     @apply bg-background text-foreground;
-    @apply antialiased; /* Added from layout.tsx for consistency */
+    @apply antialiased tracking-normal; /* Added tracking for better readability */
   }
 }
 
@@ -88,6 +104,37 @@ body {
   }
   .btn-glow-accent {
     @apply hover:shadow-[0_0_15px_0px_hsl(var(--accent))] transition-shadow duration-300;
+  }
+  /* Basic Prose styling for Rich Text Editor content */
+  .prose {
+    @apply text-foreground max-w-none;
+  }
+  .prose h2 {
+    @apply text-2xl font-bold mt-6 mb-3;
+  }
+  .prose h3 {
+    @apply text-xl font-semibold mt-5 mb-2;
+  }
+  .prose p {
+    @apply mb-4 leading-relaxed;
+  }
+  .prose ul {
+    @apply list-disc list-inside mb-4 pl-4;
+  }
+  .prose ol {
+    @apply list-decimal list-inside mb-4 pl-4;
+  }
+  .prose li {
+    @apply mb-1;
+  }
+  .prose strong {
+    @apply font-semibold;
+  }
+  .prose em {
+    @apply italic;
+  }
+  .prose s {
+    @apply line-through;
   }
 }
 
@@ -122,7 +169,7 @@ body {
     height: 700px;
     left: 5%;  /* Positioned towards top-left */
     top: 5%;
-    background: radial-gradient(circle, hsla(var(--primary), 0.5) 0%, hsla(var(--primary), 0.25) 50%, hsla(var(--background), 0) 75%);
+    background: radial-gradient(circle, hsl(var(--primary)) 0%, hsla(var(--primary), 0) 70%);
     filter: blur(100px);
     animation: subtle-trending-glow 30s infinite alternate ease-in-out;
   }
@@ -132,7 +179,7 @@ body {
     height: 600px;
     right: 5%; /* Positioned towards bottom-right */
     bottom: 5%;
-    background: radial-gradient(circle, hsla(var(--accent), 0.45) 0%, hsla(var(--accent), 0.2) 50%, hsla(var(--background), 0) 75%);
+    background: radial-gradient(circle, hsl(var(--accent)) 0%, hsla(var(--accent), 0) 70%);
     filter: blur(90px);
     animation: subtle-trending-glow-alt 35s infinite alternate ease-in-out;
     animation-delay: -15s; /* Stagger the animations */
@@ -142,29 +189,29 @@ body {
 @keyframes subtle-trending-glow {
   0% {
     transform: scale(0.7) translate(-30vw, -30vh) rotate(0deg);
-    opacity: 0.35;
+    opacity: 0.3;
   }
   50% {
     transform: scale(1.1) translate(20vw, 25vh) rotate(180deg);
-    opacity: 0.6;
+    opacity: 0.5;
   }
   100% {
     transform: scale(0.7) translate(-30vw, -30vh) rotate(360deg);
-    opacity: 0.35;
+    opacity: 0.3;
   }
 }
 
 @keyframes subtle-trending-glow-alt {
   0% {
     transform: scale(0.8) translate(25vw, 30vh) rotate(0deg);
-    opacity: 0.3;
+    opacity: 0.25;
   }
   50% {
     transform: scale(1.2) translate(-20vw, -20vh) rotate(-180deg);
-    opacity: 0.55;
+    opacity: 0.4;
   }
   100% {
     transform: scale(0.8) translate(25vw, 30vh) rotate(-360deg);
-    opacity: 0.3;
+    opacity: 0.25;
   }
 }

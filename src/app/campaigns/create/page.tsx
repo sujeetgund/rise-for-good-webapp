@@ -17,7 +17,7 @@ export default function CreateCampaignPage() {
   const handleSubmit = async (
     data: CreateInitiativeFormValues,
     moderationResult: ModerateCampaignContentOutput | null,
-    cloudinaryImageUrl: string | null, // URL from Cloudinary
+    cloudinaryImage: { url: string | null; publicId: string | null },
     userId: string
   ) => {
 
@@ -26,13 +26,14 @@ export default function CreateCampaignPage() {
       description: data.description,
       category: data.category,
       goalAmount: (data as Extract<CreateInitiativeFormValues, {goalAmount: number}>).goalAmount, // Type assertion
-      imageUrl: cloudinaryImageUrl || undefined, // Use Cloudinary URL, or undefined if null
+      imageUrl: cloudinaryImage.url || undefined,
+      imagePublicId: cloudinaryImage.publicId || undefined,
       location: data.location,
       contentWarning: data.contentWarning,
     };
     
     try {
-      const newCampaign : ICampaign = await createCampaignWithDb(campaignDataForDb, userId);
+      const newCampaign : ICampaign = await createCampaignWithDb(campaignDataForDb as any, userId);
       toast({
         title: 'Campaign Created!',
         description: `Your campaign "${newCampaign.title}" has been successfully created.`,

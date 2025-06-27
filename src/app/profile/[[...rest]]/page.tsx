@@ -15,7 +15,7 @@ import { ListChecks, HandHeart, DollarSign, Settings, Loader2, LogOut, CreditCar
 import Image from 'next/image';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { getImageGenerationCredits } from '@/actions/user-credits';
-import { getUserPetitionsByAuthorId, getUserCampaignsByOrganizerId } from '@/actions/initiative-actions'; 
+import { getUserPetitionsByAuthorId, getUserCampaignsByOrganizerId, deleteInitiative } from '@/actions/initiative-actions'; 
 import type { IPetition } from '@/models/Petition';
 import type { ICampaign } from '@/models/Campaign';
 import { cn } from '@/lib/utils';
@@ -95,6 +95,29 @@ export default function ProfilePage() {
       fetchUserCampaigns();
     }
   }, [user, isLoaded]);
+
+  const handleDeleteInitiative = async (id: string, type: InitiativeType) => {
+    try {
+      const result = await deleteInitiative({ initiativeId: id, initiativeType: type });
+      if (result.success) {
+        toast({
+          title: 'Success',
+          description: result.message,
+        });
+        if (type === InitiativeType.Petition) {
+          setUserCreatedPetitions(prev => prev?.filter(p => p._id.toString() !== id) ?? null);
+        } else {
+          setUserCreatedCampaigns(prev => prev?.filter(c => c._id.toString() !== id) ?? null);
+        }
+      }
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Deletion Failed',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred.',
+      });
+    }
+  };
 
   if (!isLoaded || (user && (isLoadingCredits || isLoadingUserPetitions || isLoadingUserCampaigns)) ) {
     return (
@@ -301,7 +324,13 @@ export default function ProfilePage() {
                 <div className="grid md:grid-cols-2 gap-6">
                   {userCreatedPetitions.map(dbPetition => {
                     const cardPetition = mapDbPetitionToCardPetition(dbPetition);
-                    return <InitiativeCard key={cardPetition.id} item={cardPetition} type={InitiativeType.Petition} />;
+                    return <InitiativeCard 
+                              key={cardPetition.id} 
+                              item={cardPetition} 
+                              type={InitiativeType.Petition} 
+                              showActions={true} 
+                              onDelete={handleDeleteInitiative}
+                            />;
                   })}
                 </div>
               ) : null}
@@ -331,7 +360,13 @@ export default function ProfilePage() {
                 <div className="grid md:grid-cols-2 gap-6">
                   {userCreatedCampaigns.map(dbCampaign => {
                     const cardCampaign = mapDbCampaignToCardCampaign(dbCampaign);
-                    return <InitiativeCard key={cardCampaign.id} item={cardCampaign} type={InitiativeType.Campaign} />;
+                    return <InitiativeCard 
+                              key={cardCampaign.id} 
+                              item={cardCampaign} 
+                              type={InitiativeType.Campaign}
+                              showActions={true}
+                              onDelete={handleDeleteInitiative}
+                            />;
                   })}
                 </div>
               ) : null}
@@ -373,7 +408,7 @@ export default function ProfilePage() {
                         <p className="font-semibold">{d.campaignTitle}</p>
                         <p className="text-sm text-muted-foreground">{new Date(d.date).toLocaleDateString()}</p>
                       </div>
-                      <p className="text-lg font-bold text-accent">${d.amount.toFixed(2)}</p>
+                      <p className="text-lg font-bold text-accent font-mono">${d.amount.toFixed(2)}</p>
                     </li>
                   ))}
                 </ul>
@@ -402,4 +437,3 @@ export default function ProfilePage() {
     </motion.div>
   );
 }
-
